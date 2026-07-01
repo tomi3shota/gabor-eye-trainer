@@ -736,6 +736,14 @@ function endVrGame() {
     });
     localStorage.setItem('gaborGameHistory', JSON.stringify(history));
 
+    submitScoreToGoogleForm({
+        difficulty: currentDifficulty,
+        platform: 'vr',
+        score: correctScore,
+        totalTime: totalClearTime,
+        grade: grade
+    });
+
     showResultOverlay(grade);
 }
 
