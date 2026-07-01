@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ガボールパッチ・アイ・トレーナー - VR版</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .vr-warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 15px 0;
+            text-align: left;
+            font-size: 0.9em;
+        }
+        .vr-steps {
+            text-align: left;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px 15px 15px 35px;
+            margin: 15px 0;
+        }
+        .vr-steps li {
+            margin: 6px 0;
+        }
+        #orientation-status {
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        #permission-btn {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div class="start-container">
+            <h1>🥽 ガボールパッチ・アイ・トレーナー(VR版)</h1>
+
+            <div class="game-description">
+                <p>スマートフォンをカードボード型のVRゴーグルに装着してプレイする、視力トレーニングのVR版です。<br>
+                課題の内容・難易度・採点方法はPC版と同じで、<strong>提示環境（画面 or VR）の違いによる効果を比較</strong>できるように作られています。</p>
+            </div>
+
+            <div class="vr-warning">
+                ⚠️ VR酔いに注意してください。気分が悪くなった場合はすぐに中止し、ゴーグルを外して休憩してください。歩行中や周囲に人・物がある場所での使用は避けてください。
+            </div>
+
+            <h3>準備手順</h3>
+            <ol class="vr-steps">
+                <li>スマートフォンを<strong>横向き（ランドスケープ）</strong>にしてください</li>
+                <li>下の「📱 センサーの使用を許可」ボタンをタップし、モーションセンサーへのアクセスを許可してください</li>
+                <li>難易度を選んで「VR開始」をタップすると全画面のステレオ（2眼）表示になります</li>
+                <li>スマホをカードボードゴーグルに装着して装着してください</li>
+                <li>画面中央の照準（レティクル）を「ある/ない」に向けたまま<strong>約1.2秒見つめる</strong>と回答できます（画面タップでも回答可）</li>
+            </ol>
+
+            <button id="permission-btn" class="start-button" onclick="requestSensorPermission()">📱 センサーの使用を許可</button>
+            <p id="orientation-status"></p>
+
+            <!-- 難易度選択 -->
+            <div class="difficulty-selection">
+                <h2>🎮 難易度を選択してVR開始</h2>
+                <div class="difficulty-cards">
+                    <button class="difficulty-card beginner vr-start-btn" data-difficulty="beginner" disabled>
+                        <h3>🟢 初級</h3>
+                        <p>制限時間: 10秒</p>
+                        <p>初心者向け・ゆっくり考える</p>
+                        <div class="start-text">VR開始</div>
+                    </button>
+
+                    <button class="difficulty-card intermediate vr-start-btn" data-difficulty="intermediate" disabled>
+                        <h3>🟡 中級</h3>
+                        <p>制限時間: 5秒</p>
+                        <p>慣れてきた方向け</p>
+                        <div class="start-text">VR開始</div>
+                    </button>
+
+                    <button class="difficulty-card advanced vr-start-btn" data-difficulty="advanced" disabled>
+                        <h3>🔴 上級</h3>
+                        <p>制限時間: 3秒</p>
+                        <p>エキスパート向け・瞬間判断</p>
+                        <div class="start-text">VR開始</div>
+                    </button>
+                </div>
+            </div>
+
+            <div class="navigation">
+                <a href="index.html" class="nav-button">🏠 ホームに戻る</a>
+                <a href="results.html" class="nav-button">📊 スコア履歴を見る</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const statusEl = document.getElementById('orientation-status');
+        const permissionBtn = document.getElementById('permission-btn');
+        const startButtons = document.querySelectorAll('.vr-start-btn');
+        let sensorReady = false;
+
+        // iOS 13+ は明示的なユーザー操作でのpermission要求が必須。
+        // Androidなど不要な環境では自動的に使用可能とみなす。
+        function needsExplicitPermission() {
+            return typeof DeviceOrientationEvent !== 'undefined' &&
+                   typeof DeviceOrientationEvent.requestPermission === 'function';
+        }
+
+        function enableStartButtons() {
+            sensorReady = true;
+            statusEl.textContent = '✅ センサーの準備ができました。難易度を選んでください。';
+            statusEl.style.color = '#28a745';
+            startButtons.forEach(btn => btn.disabled = false);
+        }
+
+        async function requestSensorPermission() {
+            try {
+                const result = await DeviceOrientationEvent.requestPermission();
+                if (result === 'granted') {
+                    enableStartButtons();
+                    permissionBtn.style.display = 'none';
+                } else {
+                    statusEl.textContent = '❌ センサーへのアクセスが許可されませんでした。設定を確認してください。';
+                    statusEl.style.color = '#dc3545';
+                }
+            } catch (error) {
+                console.error('センサー許可エラー:', error);
+                statusEl.textContent = '❌ センサーの許可に失敗しました: ' + error.message;
+                statusEl.style.color = '#dc3545';
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (needsExplicitPermission()) {
+                permissionBtn.style.display = 'inline-block';
+                statusEl.textContent = '📱 センサーの使用を許可してください（iOS）';
+                statusEl.style.color = '#666';
+            } else if (typeof DeviceOrientationEvent !== 'undefined') {
+                // Android等：明示的な許可不要のためそのまま有効化
+                enableStartButtons();
+            } else {
+                statusEl.textContent = '⚠️ このデバイスはモーションセンサーに対応していない可能性があります。VR体験が正しく動作しない場合があります。';
+                statusEl.style.color = '#dc3545';
+                enableStartButtons(); // PCでの動作確認用に一応有効化
+            }
+        });
+
+        startButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (!sensorReady) return;
+                const difficulty = btn.getAttribute('data-difficulty');
+                localStorage.setItem('selectedDifficulty', difficulty);
+                window.location.href = 'vr-game.html';
+            });
+        });
+    </script>
+</body>
+</html>
