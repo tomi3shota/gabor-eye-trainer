@@ -400,25 +400,33 @@ function calculateGrade(score, averageTime) {
  */
 function endGame() {
     stopTimer();
-    
+
+    const grade = calculateGrade(correctScore, totalClearTime);
+
     // スコアを履歴に保存
     const history = JSON.parse(localStorage.getItem('gaborGameHistory') || '[]');
     const newEntry = {
         date: new Date().toISOString(),
         score: correctScore,
         totalTime: totalClearTime,
-        grade: calculateGrade(correctScore, totalClearTime),
+        grade: grade,
         accuracy: (correctScore / MAX_QUESTIONS) * 100,
         difficulty: currentDifficulty,
         platform: 'pc' // PC版であることを記録（VR版との比較用）
     };
     history.push(newEntry);
     localStorage.setItem('gaborGameHistory', JSON.stringify(history));
-    
+
+    submitScoreToGoogleForm({
+        difficulty: currentDifficulty,
+        platform: 'pc',
+        score: correctScore,
+        totalTime: totalClearTime,
+        grade: grade
+    });
+
     gameMainArea.classList.add('hidden');
     resultArea.classList.remove('hidden');
-    
-    const grade = calculateGrade(correctScore, totalClearTime);
     
     finalScoreDisplay.textContent = `あなたのスコア: ${correctScore} / ${MAX_QUESTIONS} (${(correctScore / MAX_QUESTIONS * 100).toFixed(0)}%)`;
     finalTimeDisplay.textContent = `総クリアタイム: ${totalClearTime.toFixed(1)}秒 (平均: ${(totalClearTime / MAX_QUESTIONS).toFixed(1)}秒/問)`;
