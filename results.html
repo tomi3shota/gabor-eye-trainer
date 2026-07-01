@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スコア履歴 - ガボールパッチ・アイ・トレーナー</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div id="container">
+        <h1>📊 スコア履歴</h1>
+        
+        <div class="navigation">
+            <a href="index.html" class="nav-button">🏠 ホームに戻る</a>
+            <a href="game.html" class="nav-button">🎮 ゲームをプレイ(PC)</a>
+            <a href="vr-index.html" class="nav-button vr-nav-button">🥽 ゲームをプレイ(VR)</a>
+            <button onclick="resetGameHistory()" class="nav-button reset-button">🗑️ 履歴をリセット</button>
+        </div>
+        
+        <!-- 難易度・プラットフォームフィルター -->
+        <div class="filter-section">
+            <label for="difficulty-filter">難易度でフィルター:</label>
+            <select id="difficulty-filter" onchange="loadGameHistory()">
+                <option value="all">全ての難易度</option>
+                <option value="beginner">初級</option>
+                <option value="intermediate">中級</option>
+                <option value="advanced">上級</option>
+            </select>
+            <label for="platform-filter" style="margin-left:15px;">環境でフィルター:</label>
+            <select id="platform-filter" onchange="loadGameHistory()">
+                <option value="all">PC + VR</option>
+                <option value="pc">PCのみ</option>
+                <option value="vr">VRのみ</option>
+            </select>
+        </div>
+        
+        <!-- PC vs VR 比較グラフ（フィルター後にデータがあれば常に表示） -->
+        <div class="chart-container" id="comparison-container" style="display:none;">
+            <h2>🆚 PC版 と VR版 の比較</h2>
+            <p id="comparison-note" style="color:#6c757d; font-size:0.9em;"></p>
+            <canvas id="comparisonChart"></canvas>
+        </div>
+
+        <div id="no-data-message" class="no-data" style="display:none;">
+            <h2>📊 データがありません</h2>
+            <p>まだこの条件でのプレイ記録がありません。ゲームをプレイして記録を作成しましょう！</p>
+            <a href="index.html" class="start-button">🎮 ゲームをプレイ</a>
+        </div>
+
+        <div id="results-content">
+            <!-- 統計カード -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="total-games">0</div>
+                    <div class="stat-label">総ゲーム数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avg-score">0%</div>
+                    <div class="stat-label">平均正答率</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avg-time">0.0s</div>
+                    <div class="stat-label">平均クリア時間</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="best-grade">-</div>
+                    <div class="stat-label">最高評価</div>
+                </div>
+            </div>
+
+            <!-- スコア推移グラフ -->
+            <div class="chart-container">
+                <h2>正答率の推移</h2>
+                <canvas id="scoreChart"></canvas>
+            </div>
+            
+            <!-- クリアタイム推移グラフ -->
+            <div class="chart-container">
+                <h2>クリアタイムの推移</h2>
+                <canvas id="timeChart"></canvas>
+            </div>
+            
+            <!-- 評価分布グラフ -->
+            <div class="chart-container">
+                <h2>評価分布</h2>
+                <canvas id="gradeChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let scoreChart, timeChart, gradeChart, comparisonChart;
+        
+        // ページ読み込み時の初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadGameHistory();
+        });
+        
+        // ゲーム履歴を読み込み
+        function loadGameHistory() {
+            const selectedDifficulty = document.getElementById('difficulty-filter').value;
+            const selectedPlatform = document.getElementById('platform-filter').value;
+            
+            try {
+                const rawHistory = JSON.parse(localStorage.getItem('gaborGameHistory') || '[]');
+                // 過去のPC版データにはplatformフィールドが無いので、無い場合は'pc'とみなす（後方互換）
+                const allHistory = rawHistory.map(entry => ({
+                    ...entry,
+                    platform: entry.platform || 'pc'
+                }));
+                console.log('読み込んだ履歴:', allHistory); // デバッグ用
+                
+                // 難易度で絞った履歴（PC/VR比較グラフ用。プラットフォームでは絞らない）
+                let byDifficulty = allHistory;
+                if (selectedDifficulty !== 'all') {
+                    byDifficulty = allHistory.filter(entry => entry.difficulty === selectedDifficulty);
+                }
+                
+                // 難易度＋プラットフォームでフィルター（統計カード・推移グラフ用）
+                let gameHistory = byDifficulty;
+                if (selectedPlatform !== 'all') {
+                    gameHistory = byDifficulty.filter(entry => entry.platform === selectedPlatform);
+                }
+                
+                console.log('フィルター後の履歴:', gameHistory); // デバッグ用
+                
+                // PC vs VR 比較グラフは、データがある限り常に更新（難易度フィルターのみ反映）
+                createComparisonChart(byDifficulty, selectedDifficulty);
+                
+                if (gameHistory.length === 0) {
+                    showNoDataMessage();
+                    return;
+                }
+                
+                // 結果セクションを復元（no-dataメッセージで消えている場合のため）
+                ensureResultsSections();
+                
+                // 統計情報を更新
+                updateStatistics(gameHistory);
+                
+                // グラフを作成
+                createCharts(gameHistory);
+                
+            } catch (error) {
+                console.error('履歴読み込みエラー:', error);
+                showNoDataMessage();
+            }
+        }
+        
+        // 統計情報を更新
+        function updateStatistics(gameHistory) {
+            try {
+                const totalGames = gameHistory.length;
+                const avgScore = gameHistory.reduce((sum, game) => sum + (game.accuracy || 0), 0) / totalGames;
+                const avgTime = gameHistory.reduce((sum, game) => sum + (game.totalTime || 0), 0) / totalGames;
+                
+                // 最高評価を計算
+                const gradeOrder = ['S', 'A', 'B', 'C', 'D'];
+                let bestGrade = 'D';
+                for (const game of gameHistory) {
+                    if (game.grade && gradeOrder.indexOf(game.grade) < gradeOrder.indexOf(bestGrade)) {
+                        bestGrade = game.grade;
+                    }
+                }
+                
+                document.getElementById('total-games').textContent = totalGames;
+                document.getElementById('avg-score').textContent = avgScore.toFixed(1) + '%';
+                document.getElementById('avg-time').textContent = avgTime.toFixed(1) + 's';
+                document.getElementById('best-grade').textContent = bestGrade;
+                
+                console.log('統計更新完了:', { totalGames, avgScore, avgTime, bestGrade }); // デバッグ用
+                
+            } catch (error) {
+                console.error('統計更新エラー:', error);
+            }
+        }
+        
+        // グラフを作成
+        function createCharts(gameHistory) {
+            const labels = gameHistory.map((_, index) => `ゲーム ${index + 1}`);
+            const scores = gameHistory.map(game => game.accuracy);
+            const times = gameHistory.map(game => game.totalTime);
+            const grades = gameHistory.map(game => game.grade);
+            
+            // 正答率推移グラフ
+            createScoreChart(labels, scores);
+            
+            // クリアタイム推移グラフ
+            createTimeChart(labels, times);
+            
+            // 評価分布グラフ
+            createGradeChart(grades);
+        }
+        
+        // 正答率推移グラフ
+        function createScoreChart(labels, scores) {
+            const ctx = document.getElementById('scoreChart').getContext('2d');
+            
+            if (scoreChart) {
+                scoreChart.destroy();
+            }
+            
+            scoreChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '正答率 (%)',
+                        data: scores,
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        borderWidth: 2,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+        
+        // クリアタイム推移グラフ
+        function createTimeChart(labels, times) {
+            const ctx = document.getElementById('timeChart').getContext('2d');
+            
+            if (timeChart) {
+                timeChart.destroy();
+            }
+            
+            timeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'クリアタイム (秒)',
+                        data: times,
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        borderWidth: 2,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 評価分布グラフ
+        function createGradeChart(grades) {
+            const ctx = document.getElementById('gradeChart').getContext('2d');
+            
+            if (gradeChart) {
+                gradeChart.destroy();
+            }
+            
+            // 評価の集計
+            const gradeCounts = { 'S': 0, 'A': 0, 'B': 0, 'C': 0, 'D': 0 };
+            grades.forEach(grade => {
+                if (gradeCounts.hasOwnProperty(grade)) {
+                    gradeCounts[grade]++;
+                }
+            });
+            
+            gradeChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['S', 'A', 'B', 'C', 'D'],
+                    datasets: [{
+                        data: [gradeCounts['S'], gradeCounts['A'], gradeCounts['B'], gradeCounts['C'], gradeCounts['D']],
+                        backgroundColor: [
+                            '#ffd700', // S: ゴールド
+                            '#28a745', // A: グリーン
+                            '#17a2b8', // B: シアン
+                            '#ffc107', // C: イエロー
+                            '#dc3545'  // D: レッド
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true
+                }
+            });
+        }
+        
+        // データなしメッセージを表示
+        function showNoDataMessage() {
+            // 既存のグラフを破棄
+            if (scoreChart) {
+                scoreChart.destroy();
+                scoreChart = null;
+            }
+            if (timeChart) {
+                timeChart.destroy();
+                timeChart = null;
+            }
+            if (gradeChart) {
+                gradeChart.destroy();
+                gradeChart = null;
+            }
+            
+            document.getElementById('results-content').style.display = 'none';
+            document.getElementById('no-data-message').style.display = 'block';
+        }
+        
+        // 統計・推移グラフ表示エリアを復元
+        function ensureResultsSections() {
+            document.getElementById('results-content').style.display = 'block';
+            document.getElementById('no-data-message').style.display = 'none';
+        }
+        
+        // PC vs VR 比較グラフを作成
+        function createComparisonChart(historyForDifficulty, difficultyLabel) {
+            const container = document.getElementById('comparison-container');
+            const note = document.getElementById('comparison-note');
+            
+            const pcEntries = historyForDifficulty.filter(e => e.platform === 'pc');
+            const vrEntries = historyForDifficulty.filter(e => e.platform === 'vr');
+            
+            if (pcEntries.length === 0 || vrEntries.length === 0) {
+                // 両方のデータが揃っていないと比較にならないため非表示
+                container.style.display = 'none';
+                if (comparisonChart) {
+                    comparisonChart.destroy();
+                    comparisonChart = null;
+                }
+                return;
+            }
+            
+            container.style.display = 'block';
+            
+            const avg = (arr, key) => arr.reduce((sum, e) => sum + (e[key] || 0), 0) / arr.length;
+            const pcAccuracy = avg(pcEntries, 'accuracy');
+            const vrAccuracy = avg(vrEntries, 'accuracy');
+            const pcTime = avg(pcEntries, 'totalTime') / MAX_Q_FALLBACK(pcEntries);
+            const vrTime = avg(vrEntries, 'totalTime') / MAX_Q_FALLBACK(vrEntries);
+            
+            const diffText = difficultyLabel === 'all' ? '全難易度' :
+                { beginner: '初級', intermediate: '中級', advanced: '上級' }[difficultyLabel];
+            note.textContent = `対象: ${diffText} / PC: ${pcEntries.length}回, VR: ${vrEntries.length}回のプレイ記録に基づく平均値`;
+            
+            const ctx = document.getElementById('comparisonChart').getContext('2d');
+            if (comparisonChart) {
+                comparisonChart.destroy();
+            }
+            
+            comparisonChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['平均正答率 (%)', '平均回答時間 (秒/問)'],
+                    datasets: [
+                        {
+                            label: '💻 PC版',
+                            data: [pcAccuracy, pcTime],
+                            backgroundColor: 'rgba(0, 123, 255, 0.6)'
+                        },
+                        {
+                            label: '🥽 VR版',
+                            data: [vrAccuracy, vrTime],
+                            backgroundColor: 'rgba(220, 53, 69, 0.6)'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+        
+        // 1問あたりの平均時間を出すための問題数（historyに保存されていないため10で固定。将来的にentry.totalQuestionsがあればそれを使う）
+        function MAX_Q_FALLBACK(entries) {
+            return 10;
+        }
+        
+        // スコア履歴をリセット
+        function resetGameHistory() {
+            if (confirm('⚠️ 本当にすべてのスコア履歴を削除しますか？\n\nこの操作は取り消すことができません。')) {
+                localStorage.removeItem('gaborGameHistory');
+                
+                // 確認メッセージを表示
+                alert('✅ スコア履歴が削除されました！');
+                
+                // ページを再読み込みして表示を更新
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ガボールパッチ・アイ・トレーナー</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="container">
+        <div class="start-container">
+            <h1>ガボールパッチ・アイ・トレーナー</h1>
+            
+            <div class="game-description">
+                <h2>ゲームについて</h2>
+                <p>ガボールパッチを使った視力トレーニングゲームです。<br>
+                お題の画像と同じパターンが9個の画像の中にあるかどうかを判断してください。</p>
+                
+                <h3>ゲームの流れ</h3>
+                <ul>
+                    <li>🎯 <strong>お題の画像</strong>が上部に表示されます</li>
+                    <li>🔍 <strong>9個の画像</strong>の中からお題と同じものを探します</li>
+                    <li>✅ 同じ画像が<strong>ある場合は「ある！」</strong>をクリック</li>
+                    <li>❌ 同じ画像が<strong>ない場合は「ない！」</strong>をクリック</li>
+                    <li>⏰ <strong>制限時間内</strong>に答えてください（難易度により異なります）</li>
+                    <li>📝 <strong>10問</strong>で1セット完了です</li>
+                </ul>
+            </div>
+            
+            <!-- 難易度選択 -->
+            <div class="difficulty-selection">
+                <h2>🎮 難易度を選択してゲーム開始</h2>
+                <div class="difficulty-cards">
+                    <button class="difficulty-card beginner" onclick="startGame('beginner')">
+                        <h3>🟢 初級</h3>
+                        <p>制限時間: 10秒</p>
+                        <p>初心者向け・ゆっくり考える</p>
+                        <div class="start-text">クリックして開始</div>
+                    </button>
+                    
+                    <button class="difficulty-card intermediate" onclick="startGame('intermediate')">
+                        <h3>🟡 中級</h3>
+                        <p>制限時間: 5秒</p>
+                        <p>慣れてきた方向け</p>
+                        <div class="start-text">クリックして開始</div>
+                    </button>
+                    
+                    <button class="difficulty-card advanced" onclick="startGame('advanced')">
+                        <h3>🔴 上級</h3>
+                        <p>制限時間: 3秒</p>
+                        <p>エキスパート向け・瞬間判断</p>
+                        <div class="start-text">クリックして開始</div>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="navigation">
+                <a href="results.html" class="nav-button">📊 スコア履歴を見る</a>
+                <a href="vr-index.html" class="nav-button vr-nav-button">🥽 VR版で挑戦</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function startGame(difficulty) {
+            // 選択した難易度をローカルストレージに保存
+            localStorage.setItem('selectedDifficulty', difficulty);
+            // ゲームページに移動
+            window.location.href = 'game.html';
+        }
+    </script>
+</body>
+</html>

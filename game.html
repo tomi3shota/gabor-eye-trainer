@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ガボールパッチ・アイ・トレーナー - ゲーム</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="container">
+        <h1>ガボールパッチ視力トレーニング</h1>
+        
+        <div class="navigation">
+            <a href="index.html" class="nav-button">🏠 ホームに戻る</a>
+            <a href="results.html" class="nav-button">📊 スコア履歴を見る</a>
+        </div>
+        
+        <div class="difficulty-info">
+            <p>難易度: <span id="difficulty-info">初級 (制限時間: 10秒)</span></p>
+        </div>
+        
+        <!-- カウントダウン表示 -->
+        <div id="countdown-overlay" class="countdown-overlay hidden">
+            <div class="countdown-content">
+                <h2>トレーニング開始まで</h2>
+                <div id="countdown-number">3</div>
+                <p>準備はよろしいですか？</p>
+            </div>
+        </div>
+        
+        <div id="score-display">
+            <p>現在のスコア: <span id="current-score">0</span> / <span id="max-questions">10</span></p>
+            <p>残り問題数: <span id="question-count">10</span></p>
+            <p>制限時間: <span id="time-remaining">10</span>秒</p>
+            <p>総クリアタイム: <span id="total-time">0.0</span>秒</p>
+        </div>
+
+        <!-- ゲームメインエリア（横並びレイアウト） -->
+        <div id="game-main-area">
+            <!-- お題表示エリア -->
+            <div id="target-area">
+                <h2>お題</h2>
+                <div id="target-display">
+                    <img id="target-gabor-image" src="" alt="お題のガボールパッチ" class="target-image">
+                </div>
+                <div id="answer-buttons">
+                    <button id="btn-yes">ある！</button>
+                    <button id="btn-no">ない！</button>
+                </div>
+                <p id="feedback"></p>
+            </div>
+
+            <!-- 9個の画像表示エリア -->
+            <div id="gabor-area">
+            </div>
+        </div>
+
+        <div id="control-panel" class="hidden">
+            <!-- デバッグ情報表示（開発用） -->
+            <div id="debug-info" style="margin-top: 20px; padding: 10px; background: #f0f0f0; border-radius: 5px; font-size: 0.8em;">
+                <p><strong>デバッグ情報:</strong></p>
+                <p>お題画像: <span id="debug-target">-</span></p>
+                <p>お題存在: <span id="debug-present">-</span></p>
+                <p>表示画像一覧: <span id="debug-images">-</span></p>
+            </div>
+        </div>
+
+        <div id="result-area" class="hidden">
+            <h2>トレーニング終了！</h2>
+            <p id="final-score">あなたのスコア: 0 / 10</p>
+            <p id="final-time">総クリアタイム: 0.0秒</p>
+            <p id="final-grade" class="grade">評価: C</p>
+            <button onclick="restartGame()">もう一度挑戦する</button>
+            <a href="index.html" class="nav-button">ホームに戻る</a>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,452 @@
+body {
+    font-family: 'Arial', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    background-color: #f4f4f9;
+}
+
+#container {
+    background: #fff;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    width: 90%;
+    max-width: 600px;
+}
+
+h1 {
+    color: #333;
+}
+
+/* ナビゲーション */
+.navigation {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.nav-button {
+    padding: 10px 20px;
+    margin: 0 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 0.9em;
+}
+
+.nav-button:hover {
+    background-color: #0056b3;
+}
+
+.reset-button {
+    background-color: #dc3545 !important;
+    border: 2px solid #dc3545;
+    transition: all 0.3s ease;
+}
+
+.vr-nav-button {
+    background-color: #6f42c1;
+}
+
+.vr-nav-button:hover {
+    background-color: #59339d;
+}
+
+.reset-button:hover {
+    background-color: #c82333 !important;
+    border-color: #bd2130;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+/* 難易度表示 */
+.difficulty-info {
+    background: #f0f8ff;
+    padding: 10px;
+    border-radius: 5px;
+    margin: 10px 0;
+}
+
+/* 難易度選択カード */
+.difficulty-cards {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 20px 0;
+}
+
+.difficulty-card {
+    background: white;
+    border: 3px solid #ddd;
+    border-radius: 15px;
+    padding: 25px;
+    min-width: 180px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    position: relative;
+    /* ボタンとしてのスタイルを追加 */
+    font-family: inherit;
+    outline: none;
+    text-align: center;
+}
+
+.difficulty-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+}
+
+.difficulty-card:active {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+}
+
+.difficulty-card.beginner {
+    border-color: #28a745;
+}
+
+.difficulty-card.beginner:hover {
+    background-color: #f8fff9;
+    border-color: #20c997;
+}
+
+.difficulty-card.intermediate {
+    border-color: #ffc107;
+}
+
+.difficulty-card.intermediate:hover {
+    background-color: #fffdf0;
+    border-color: #e0a800;
+}
+
+.difficulty-card.advanced {
+    border-color: #dc3545;
+}
+
+.difficulty-card.advanced:hover {
+    background-color: #fff5f5;
+    border-color: #c82333;
+}
+
+.difficulty-card h3 {
+    margin: 0 0 10px 0;
+    color: #333;
+}
+
+.difficulty-card p {
+    margin: 5px 0;
+    color: #666;
+    font-size: 0.9em;
+}
+
+.start-text {
+    margin-top: 15px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 0.9em;
+    transition: all 0.3s ease;
+}
+
+/* スタート画面 */
+.start-container {
+    text-align: center;
+}
+
+.game-description {
+    background: #f8f9fa;
+    border: 1px solid #007bff;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* 結果ページ */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.stat-card {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    border: 2px solid #e9ecef;
+}
+
+.stat-value {
+    font-size: 2em;
+    font-weight: bold;
+    color: #007bff;
+}
+
+.stat-label {
+    color: #6c757d;
+    margin-top: 5px;
+}
+
+.chart-container {
+    margin: 20px 0;
+    padding: 20px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.filter-section {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.filter-section select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-left: 10px;
+}
+
+.no-data {
+    text-align: center;
+    padding: 40px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    margin: 20px 0;
+}
+
+.start-button {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    font-size: 1.2em;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    margin: 10px;
+}
+
+.start-button:hover {
+    background-color: #218838;
+}
+
+.difficulty-info p {
+    margin: 0;
+    font-weight: bold;
+    color: #007bff;
+}
+
+/* カウントダウン表示 */
+.countdown-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.countdown-content {
+    background: white;
+    padding: 50px;
+    border-radius: 20px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.countdown-content h2 {
+    color: #333;
+    margin-bottom: 20px;
+}
+
+#countdown-number {
+    font-size: 120px;
+    font-weight: bold;
+    color: #007bff;
+    margin: 20px 0;
+    animation: countdown-pulse 1s ease-in-out;
+}
+
+@keyframes countdown-pulse {
+    0% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.5; }
+}
+
+.countdown-content p {
+    color: #666;
+    font-size: 18px;
+    margin-top: 20px;
+}
+
+/* ゲームメインエリア（横並びレイアウト） */
+#game-main-area {
+    display: flex;
+    gap: 30px;
+    margin: 20px 0;
+    align-items: flex-start;
+}
+
+/* お題表示エリア */
+#target-area {
+    flex: 0 0 250px; /* 固定幅250px */
+    text-align: center;
+}
+
+#target-area h2 {
+    color: #007bff;
+    margin-bottom: 15px;
+    font-size: 1.5em;
+}
+
+/* ガボールパッチ表示エリア */
+#gabor-area {
+    flex: 1; /* 残りのスペースを使用 */
+    display: grid;
+    /* 3x3のグリッドで均等に配置 */
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 10px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+}
+
+.gabor-patch {
+    width: 100%;
+    /* アスペクト比を1:1に保つ */
+    aspect-ratio: 1 / 1; 
+    /* 画像を完全に覆うためにオブジェクトフィットを使用 */
+    object-fit: cover; 
+    border-radius: 50%; /* パッチを円形にしたい場合 */
+}
+
+/* コントロールパネル */
+#control-panel {
+    margin-top: 20px;
+}
+
+/* お題画像のスタイル */
+#target-display {
+    margin: 15px 0;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border: 3px solid #007bff;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
+}
+
+.target-image {
+    width: 150px;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid #333;
+}
+
+#answer-buttons {
+    margin: 20px 0;
+}
+
+#answer-buttons button {
+    display: block;
+    width: 100%;
+    padding: 12px 20px;
+    margin: 8px 0;
+    font-size: 1.1em;
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+#btn-yes {
+    background-color: #4CAF50; /* 緑 */
+    color: white;
+}
+
+#btn-no {
+    background-color: #F44336; /* 赤 */
+    color: white;
+}
+
+#btn-yes:hover, #btn-no:hover {
+    opacity: 0.8;
+}
+
+/* レスポンシブデザイン */
+@media (max-width: 768px) {
+    #game-main-area {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    #target-area {
+        flex: none;
+        width: 100%;
+    }
+    
+    .target-image {
+        width: 120px;
+        height: 120px;
+    }
+    
+    #answer-buttons {
+        display: flex;
+        gap: 10px;
+    }
+    
+    #answer-buttons button {
+        flex: 1;
+        margin: 0;
+    }
+}
+
+/* 結果表示 */
+.hidden {
+    display: none;
+}
+
+#feedback {
+    margin-top: 10px;
+    font-weight: bold;
+    min-height: 20px; /* 一時的なメッセージ表示用に高さを確保 */
+}
+
+/* タイマー表示 */
+#time-remaining {
+    color: #ff4444;
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+/* 評価表示 */
+.grade {
+    font-size: 2em;
+    font-weight: bold;
+    margin: 15px 0;
+}
+
+.grade-A { color: #4CAF50; } /* 緑 */
+.grade-B { color: #8BC34A; } /* 薄緑 */
+.grade-C { color: #FFC107; } /* 黄 */
+.grade-D { color: #FF9800; } /* オレンジ */
+.grade-E { color: #F44336; } /* 赤 */
