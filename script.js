@@ -12,85 +12,6 @@ const DIFFICULTY_SETTINGS = {
 let currentDifficulty = 'beginner'; // デフォルト難易度
 let TIME_LIMIT = 10; // 動的に変更される制限時間
 
-// 🚨 事前準備したガボールパッチ画像のファイルパス
-const GABOR_IMAGES = [
-    'images/gabor_01.png',
-    'images/gabor_02.png',
-    'images/gabor_03.png',
-    'images/gabor_04.png',
-    'images/gabor_05.png',
-    'images/gabor_06.png',
-    'images/gabor_07.png',
-    'images/gabor_08.png',
-    'images/gabor_09.png',
-    'images/gabor_10.png',
-    'images/gabor_11.png',
-    'images/gabor_12.png',
-    'images/gabor_13.png',
-    'images/gabor_14.png',
-    'images/gabor_15.png',
-    'images/gabor_16.png',
-    'images/gabor_17.png',
-    'images/gabor_18.png',
-    'images/gabor_19.png',
-    'images/gabor_20.png',
-    'images/gabor_21.png',
-    'images/gabor_22.png',
-    'images/gabor_23.png',
-    'images/gabor_24.png',
-    'images/gabor_25.png',
-    'images/gabor_26.png',
-    'images/gabor_27.png',
-    'images/gabor_28.png',
-    'images/gabor_29.png',
-    'images/gabor_30.png',
-    'images/gabor_31.png',
-    'images/gabor_32.png',
-    'images/gabor_33.png',
-    'images/gabor_34.png',
-    'images/gabor_35.png',
-    'images/gabor_36.png',
-    'images/gabor_37.png',
-    'images/gabor_38.png',
-    'images/gabor_39.png',
-    'images/gabor_40.png',
-    'images/gabor_41.png',
-    'images/gabor_42.png',
-    'images/gabor_43.png',
-    'images/gabor_44.png',
-    'images/gabor_45.png',
-    'images/gabor_46.png',
-    'images/gabor_47.png'
-];
-
-// 画像の存在確認関数
-function checkImageExists(imagePath) {
-    return new Promise((resolve) => {
-        const img = new Image();
-        const startTime = performance.now();
-        
-        img.onload = () => {
-            const loadTime = performance.now() - startTime;
-            console.log(`✅ 画像読み込み成功: ${imagePath} (${loadTime.toFixed(2)}ms)`);
-            resolve(true);
-        };
-        
-        img.onerror = () => {
-            const loadTime = performance.now() - startTime;
-            console.error(`❌ 画像読み込み失敗: ${imagePath} (${loadTime.toFixed(2)}ms)`);
-            resolve(false);
-        };
-        
-        // タイムアウト処理（5秒）
-        setTimeout(() => {
-            console.warn(`⏰ 画像読み込みタイムアウト: ${imagePath}`);
-            resolve(false);
-        }, 5000);
-        
-        img.src = imagePath;
-    });
-}
-
 // --- DOM要素 ---
 const gaborArea = document.getElementById('gabor-area');
 const scoreDisplay = document.getElementById('current-score');
@@ -114,8 +35,10 @@ let totalClearTime = 0;
 let timer;
 let remainingTime = TIME_LIMIT;
 let targetImage = '';
+let targetConfig = null;
 let hasTarget = false;
 let gaborPatches = [];
+let trialLog = []; // 問題単位のログ（信号検出理論のd′計算に使用）
 
 /**
  * ランダムな要素を配列から選択
@@ -171,33 +94,11 @@ async function startGame() {
         difficultyInfo.textContent = `${DIFFICULTY_SETTINGS[selectedDifficulty].name} (制限時間: ${TIME_LIMIT}秒)`;
     }
     
-    // 画像プリロード
-    console.log('画像をプリロード中...');
-    console.log('プリロード対象画像数:', GABOR_IMAGES.length);
-    
-    const loadPromises = GABOR_IMAGES.map((imagePath, index) => {
-        console.log(`画像 ${index + 1}/${GABOR_IMAGES.length}: ${imagePath}`);
-        return checkImageExists(imagePath);
-    });
-    
-    const results = await Promise.all(loadPromises);
-    const failedImages = GABOR_IMAGES.filter((_, index) => !results[index]);
-    
-    console.log('プリロード結果:');
-    console.log('- 成功:', results.filter(r => r).length, '個');
-    console.log('- 失敗:', failedImages.length, '個');
-    
-    if (failedImages.length > 0) {
-        console.error('読み込みに失敗した画像:', failedImages);
-        alert(`画像の読み込みに失敗しました。\n失敗した画像数: ${failedImages.length}\n\nゲームは続行可能ですが、一部画像が表示されない可能性があります。\n\n失敗した画像:\n${failedImages.join('\n')}`);
-    } else {
-        console.log('✅ 全ての画像のプリロードが完了しました。');
-    }
-    
     // ゲーム状態をリセット
     currentQuestionNumber = 0;
     correctScore = 0;
     totalClearTime = 0;
+    trialLog = [];
     
     // UI要素を表示/非表示
     gameMainArea.classList.remove('hidden');
@@ -235,41 +136,37 @@ function nextQuestion() {
  * 問題を生成
  */
 function generateQuestion() {
-    // ターゲット画像をランダムに選択
-    targetImage = getRandomElement(GABOR_IMAGES);
-    
+    // ターゲットのガボールパッチをその場でランダム生成（固定画像を使い回さないことで記憶による正答を防ぐ）
+    targetConfig = randomGaborConfig();
+    targetImage = renderGaborDataURL(targetConfig);
+
     // ターゲットが含まれるかどうかをランダムに決定
     hasTarget = Math.random() < 0.5;
-    
+
     // 9個のガボールパッチを生成
     gaborPatches = [];
-    
+
     if (hasTarget) {
-        // ターゲットを含む場合、まずターゲットを追加
+        // ターゲットと同じ画像（同一パラメータ）を1枚含める
         gaborPatches.push(targetImage);
-        
-        // 残り8個は他の画像から選択
-        const otherImages = GABOR_IMAGES.filter(img => img !== targetImage);
         for (let i = 0; i < PATCH_COUNT - 1; i++) {
-            gaborPatches.push(getRandomElement(otherImages));
+            gaborPatches.push(renderGaborDataURL(randomDistractorConfig(targetConfig)));
         }
     } else {
-        // ターゲットを含まない場合、ターゲット以外から9個選択
-        const otherImages = GABOR_IMAGES.filter(img => img !== targetImage);
         for (let i = 0; i < PATCH_COUNT; i++) {
-            gaborPatches.push(getRandomElement(otherImages));
+            gaborPatches.push(renderGaborDataURL(randomDistractorConfig(targetConfig)));
         }
     }
-    
+
     // 配列をシャッフル
     gaborPatches = shuffleArray(gaborPatches);
-    
+
     // 問題開始時刻を記録
     questionStartTime = Date.now();
-    
+
     // UIに反映
     displayQuestion();
-    
+
     console.log(`問題 ${currentQuestionNumber}: ターゲット ${hasTarget ? 'あり' : 'なし'}`);
 }
 
@@ -358,7 +255,16 @@ function checkAnswer(userAnswer, isTimeout = false) {
     
     const responseTime = (Date.now() - questionStartTime) / 1000;
     const isCorrect = userAnswer === hasTarget;
-    
+
+    trialLog.push({
+        questionNo: currentQuestionNumber,
+        hasTarget: hasTarget,
+        userAnswer: userAnswer,
+        correct: isCorrect,
+        isTimeout: isTimeout,
+        responseTime: responseTime
+    });
+
     if (isCorrect && !isTimeout) {
         correctScore++;
         totalClearTime += responseTime;
@@ -402,6 +308,7 @@ function endGame() {
     stopTimer();
 
     const grade = calculateGrade(correctScore, totalClearTime);
+    const sdt = computeSignalDetectionCounts(trialLog);
 
     // スコアを履歴に保存
     const history = JSON.parse(localStorage.getItem('gaborGameHistory') || '[]');
@@ -412,7 +319,9 @@ function endGame() {
         grade: grade,
         accuracy: (correctScore / MAX_QUESTIONS) * 100,
         difficulty: currentDifficulty,
-        platform: 'pc' // PC版であることを記録（VR版との比較用）
+        platform: 'pc', // PC版であることを記録（VR版との比較用）
+        trialLog: trialLog,
+        signalDetection: sdt
     };
     history.push(newEntry);
     localStorage.setItem('gaborGameHistory', JSON.stringify(history));
@@ -422,7 +331,8 @@ function endGame() {
         platform: 'pc',
         score: correctScore,
         totalTime: totalClearTime,
-        grade: grade
+        grade: grade,
+        trialLog: trialLog
     });
 
     gameMainArea.classList.add('hidden');

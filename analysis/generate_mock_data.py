@@ -52,6 +52,17 @@ for name in PARTICIPANTS:
         else:
             grade = "D"
 
+        # 信号検出理論の4分類もダミー生成(実際の10問はhasTarget=trueがおよそ半分)
+        n_target_present = random.randint(3, 7)
+        n_target_absent = 10 - n_target_present
+        sensitivity = (accuracy - 50) / 50  # -1〜1程度。プラスなら感度が高い想定
+        hit_rate = min(0.95, max(0.05, 0.5 + sensitivity * 0.4 + random.gauss(0, 0.1)))
+        fa_rate = min(0.95, max(0.05, 0.5 - sensitivity * 0.4 + random.gauss(0, 0.1)))
+        hits = round(hit_rate * n_target_present)
+        misses = n_target_present - hits
+        false_alarms = round(fa_rate * n_target_absent)
+        correct_rejections = n_target_absent - false_alarms
+
         t += timedelta(minutes=random.randint(5, 240))
         rows.append([
             t.strftime("%Y/%m/%d %H:%M:%S"),
@@ -61,6 +72,10 @@ for name in PARTICIPANTS:
             score,
             total_time,
             grade,
+            hits,
+            misses,
+            false_alarms,
+            correct_rejections,
         ])
 
 rows.sort(key=lambda r: r[0])
@@ -75,6 +90,10 @@ with open(OUT_PATH, "w", newline="", encoding="utf-8") as f:
         "スコア",
         "総クリアタイム",
         "評価",
+        "ヒット数",
+        "見逃し数",
+        "フォルスアラーム数",
+        "正棄却数",
     ])
     writer.writerows(rows)
 
