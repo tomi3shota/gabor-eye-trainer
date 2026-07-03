@@ -6,18 +6,20 @@
     <title>スコア履歴 - ガボールパッチ・アイ・トレーナー</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="auth.js"></script>
+    <script>requireLogin();</script>
 </head>
 <body>
     <div id="container">
         <h1>📊 スコア履歴</h1>
-        
+
         <div class="navigation">
             <a href="index.html" class="nav-button">🏠 ホームに戻る</a>
             <a href="game.html" class="nav-button">🎮 ゲームをプレイ(PC)</a>
             <a href="vr-index.html" class="nav-button vr-nav-button">🥽 ゲームをプレイ(VR)</a>
             <button onclick="resetGameHistory()" class="nav-button reset-button">🗑️ 履歴をリセット</button>
         </div>
-        
+
         <!-- 難易度・プラットフォームフィルター -->
         <div class="filter-section">
             <label for="difficulty-filter">難易度でフィルター:</label>

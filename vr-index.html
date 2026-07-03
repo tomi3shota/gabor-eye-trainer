@@ -91,10 +91,17 @@
                 <a href="index.html" class="nav-button">🏠 ホームに戻る</a>
                 <a href="results.html" class="nav-button">📊 スコア履歴を見る</a>
             </div>
+            <p id="current-user-info" style="margin-top:15px; font-size:0.9em; color:#6c757d;"></p>
         </div>
     </div>
 
+    <script src="auth.js"></script>
     <script>
+        if (requireLogin()) {
+            document.getElementById('current-user-info').innerHTML =
+                `${getCurrentUser()} さんとしてプレイ中　<a href="#" onclick="logout(); return false;">ログアウト</a>`;
+        }
+
         const statusEl = document.getElementById('orientation-status');
         const permissionBtn = document.getElementById('permission-btn');
         const startButtons = document.querySelectorAll('.vr-start-btn');

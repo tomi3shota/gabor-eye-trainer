@@ -39,14 +39,10 @@ function computeSignalDetectionCounts(trialLog) {
     return counts;
 }
 
-// 同一端末での2回目以降のプレイでは、保存済みの名前を再利用してブレを防ぐ
+// ログイン中のユーザー名を使う(auth.js)。同じ端末を複数人で共有していても、
+// ログインしている人の名前で送信されるため取り違えが起きない
 function getPlayerName() {
-    let name = localStorage.getItem('gaborPlayerName');
-    if (!name) {
-        name = window.prompt('お名前・ニックネームを入力してください\n（次回以降はこの端末で自動的に使われます）', '') || '匿名';
-        localStorage.setItem('gaborPlayerName', name);
-    }
-    return name;
+    return getCurrentUser() || '匿名';
 }
 
 function submitScoreToGoogleForm({ difficulty, platform, score, totalTime, grade, trialLog }) {

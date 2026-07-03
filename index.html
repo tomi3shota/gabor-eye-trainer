@@ -58,10 +58,17 @@
                 <a href="results.html" class="nav-button">📊 スコア履歴を見る</a>
                 <a href="vr-index.html" class="nav-button vr-nav-button">🥽 VR版で挑戦</a>
             </div>
+            <p id="current-user-info" style="margin-top:15px; font-size:0.9em; color:#6c757d;"></p>
         </div>
     </div>
 
+    <script src="auth.js"></script>
     <script>
+        if (requireLogin()) {
+            document.getElementById('current-user-info').innerHTML =
+                `${getCurrentUser()} さんとしてプレイ中　<a href="#" onclick="logout(); return false;">ログアウト</a>`;
+        }
+
         function startGame(difficulty) {
             // 選択した難易度をローカルストレージに保存
             localStorage.setItem('selectedDifficulty', difficulty);
