@@ -15,25 +15,6 @@ const DIFFICULTY_SETTINGS = {
     advanced: { timeLimit: 3, name: '上級' }
 };
 
-const GABOR_IMAGES = [
-    'images/gabor_01.png','images/gabor_02.png','images/gabor_03.png',
-    'images/gabor_04.png','images/gabor_05.png','images/gabor_06.png',
-    'images/gabor_07.png','images/gabor_08.png','images/gabor_09.png',
-    'images/gabor_10.png','images/gabor_11.png','images/gabor_12.png',
-    'images/gabor_13.png','images/gabor_14.png','images/gabor_15.png',
-    'images/gabor_16.png','images/gabor_17.png','images/gabor_18.png',
-    'images/gabor_19.png','images/gabor_20.png','images/gabor_21.png',
-    'images/gabor_22.png','images/gabor_23.png','images/gabor_24.png',
-    'images/gabor_25.png','images/gabor_26.png','images/gabor_27.png',
-    'images/gabor_28.png','images/gabor_29.png','images/gabor_30.png',
-    'images/gabor_31.png','images/gabor_32.png','images/gabor_33.png',
-    'images/gabor_34.png','images/gabor_35.png','images/gabor_36.png',
-    'images/gabor_37.png','images/gabor_38.png','images/gabor_39.png',
-    'images/gabor_40.png','images/gabor_41.png','images/gabor_42.png',
-    'images/gabor_43.png','images/gabor_44.png','images/gabor_45.png',
-    'images/gabor_46.png','images/gabor_47.png'
-];
-
 const DWELL_TIME_MS = 1200; // 注視でボタンを選択するまでの時間
 
 // --- ゲーム状態 ---
@@ -45,16 +26,14 @@ let questionStartTime = 0;
 let totalClearTime = 0;
 let questionTimer = null;
 let remainingTime = TIME_LIMIT;
-let targetImagePath = '';
+let targetConfig = null;
 let hasTarget = false;
-let gaborPatchPaths = [];
+let gaborPatchConfigs = [];
 let gameActive = false;
 let answering = false; // 二重回答防止
+let trialLog = []; // 問題単位のログ（信号検出理論のd′計算に使用）
 
 // --- ユーティリティ ---
-function getRandomElement(array) {
-    return array[Math.floor(Math.random() * array.length)];
-}
 function shuffleArray(array) {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -75,7 +54,6 @@ let hudCanvas, hudCtx, hudTexture, hudMesh;
 let feedbackCanvas, feedbackCtx, feedbackTexture, feedbackMesh;
 let reticleLeftEl, reticleRightEl;
 
-const textureLoader = new THREE.TextureLoader();
 const clock = new THREE.Clock();
 
 const IPD = 0.064; // 瞳孔間距離(m)の近似値
@@ -492,33 +470,6 @@ function onScreenTap() {
 // =============================================================
 // ゲームロジック（PC版 script.js と同等）
 // =============================================================
-function preloadTexture(path) {
-    return new Promise((resolve) => {
-        textureLoader.load(
-            path,
-            (tex) => resolve(tex),
-            undefined,
-            () => resolve(null) // 失敗時はnull（代替表示にフォールバック）
-        );
-    });
-}
-
-// 全ガボールパッチ画像を事前に一括ロード（PC版と同様、出題中の遅延を防ぐため）
-let textureCache = {};
-let texturesPreloaded = false;
-
-async function preloadAllTextures(onProgress) {
-    if (texturesPreloaded) return;
-    let loaded = 0;
-    await Promise.all(GABOR_IMAGES.map(async (path) => {
-        const tex = await preloadTexture(path);
-        textureCache[path] = tex; // 失敗時はnull（フォールバック表示に使用）
-        loaded++;
-        if (onProgress) onProgress(loaded, GABOR_IMAGES.length);
-    }));
-    texturesPreloaded = true;
-}
-
 async function startVrGame() {
     const selectedDifficulty = localStorage.getItem('selectedDifficulty') || 'beginner';
     currentDifficulty = selectedDifficulty;
@@ -528,26 +479,13 @@ async function startVrGame() {
     correctScore = 0;
     totalClearTime = 0;
     remainingTime = TIME_LIMIT;
+    trialLog = [];
     drawHud();
 
-    await showLoadingOverlay();
     await runCountdown();
 
     gameActive = true;
     nextQuestion();
-}
-
-function showLoadingOverlay() {
-    const overlay = document.getElementById('start-overlay');
-    overlay.classList.remove('hidden');
-    overlay.innerHTML = `
-        <h1>画像を準備しています…</h1>
-        <p id="loading-progress">0 / ${GABOR_IMAGES.length}</p>
-    `;
-    const progressEl = document.getElementById('loading-progress');
-    return preloadAllTextures((loaded, total) => {
-        if (progressEl) progressEl.textContent = `${loaded} / ${total}`;
-    });
 }
 
 function runCountdown() {
@@ -593,36 +531,38 @@ function nextQuestion() {
 }
 
 function generateQuestion() {
-    targetImagePath = getRandomElement(GABOR_IMAGES);
+    // ターゲットのガボールパッチをその場でランダム生成（固定画像を使い回さないことで記憶による正答を防ぐ）
+    targetConfig = randomGaborConfig();
     hasTarget = Math.random() < 0.5;
 
-    gaborPatchPaths = [];
+    gaborPatchConfigs = [];
     if (hasTarget) {
-        gaborPatchPaths.push(targetImagePath);
-        const others = GABOR_IMAGES.filter(img => img !== targetImagePath);
+        gaborPatchConfigs.push(targetConfig); // ターゲットと同一パラメータの1枚を含める
         for (let i = 0; i < PATCH_COUNT - 1; i++) {
-            gaborPatchPaths.push(getRandomElement(others));
+            gaborPatchConfigs.push(randomDistractorConfig(targetConfig));
         }
     } else {
-        const others = GABOR_IMAGES.filter(img => img !== targetImagePath);
         for (let i = 0; i < PATCH_COUNT; i++) {
-            gaborPatchPaths.push(getRandomElement(others));
+            gaborPatchConfigs.push(randomDistractorConfig(targetConfig));
         }
     }
-    gaborPatchPaths = shuffleArray(gaborPatchPaths);
+    gaborPatchConfigs = shuffleArray(gaborPatchConfigs);
 
     questionStartTime = Date.now();
 
-    // お題画像を適用（事前ロード済みキャッシュから同期的に取得）
-    applyTextureToMesh(targetMesh, textureCache[targetImagePath] || null);
+    // お題画像を適用
+    applyTextureToMesh(targetMesh, new THREE.CanvasTexture(renderGaborCanvas(targetConfig)));
 
     // 9枚のパッチ画像を適用
     for (let i = 0; i < patchMeshes.length; i++) {
-        applyTextureToMesh(patchMeshes[i], textureCache[gaborPatchPaths[i]] || null);
+        applyTextureToMesh(patchMeshes[i], new THREE.CanvasTexture(renderGaborCanvas(gaborPatchConfigs[i])));
     }
 }
 
 function applyTextureToMesh(mesh, texture) {
+    if (mesh.material.map) {
+        mesh.material.map.dispose(); // 毎問題ごとに新しいCanvasTextureを作るため、古いテクスチャのGPUメモリを解放する
+    }
     if (texture) {
         fitTextureCover(texture, 1); // 正方形プレーンに対して中央クロップ表示（PC版のobject-fit:coverと見た目を揃える）
         mesh.material.map = texture;
@@ -691,6 +631,15 @@ function triggerAnswer(userAnswer, isTimeout = false) {
     const responseTime = (Date.now() - questionStartTime) / 1000;
     const isCorrect = userAnswer === hasTarget;
 
+    trialLog.push({
+        questionNo: currentQuestionNumber,
+        hasTarget: hasTarget,
+        userAnswer: userAnswer,
+        correct: isCorrect,
+        isTimeout: isTimeout,
+        responseTime: responseTime
+    });
+
     if (isCorrect && !isTimeout) {
         correctScore++;
         totalClearTime += responseTime;
@@ -723,6 +672,7 @@ function endVrGame() {
     stopQuestionTimer();
 
     const grade = calculateGrade(correctScore, totalClearTime);
+    const sdt = computeSignalDetectionCounts(trialLog);
     const history = JSON.parse(localStorage.getItem('gaborGameHistory') || '[]');
     history.push({
         date: new Date().toISOString(),
@@ -732,7 +682,9 @@ function endVrGame() {
         accuracy: (correctScore / MAX_QUESTIONS) * 100,
         difficulty: currentDifficulty,
         totalQuestions: MAX_QUESTIONS,
-        platform: 'vr' // VR版であることを記録（PC版との比較用）
+        platform: 'vr', // VR版であることを記録（PC版との比較用）
+        trialLog: trialLog,
+        signalDetection: sdt
     });
     localStorage.setItem('gaborGameHistory', JSON.stringify(history));
 
@@ -741,7 +693,8 @@ function endVrGame() {
         platform: 'vr',
         score: correctScore,
         totalTime: totalClearTime,
-        grade: grade
+        grade: grade,
+        trialLog: trialLog
     });
 
     showResultOverlay(grade);
