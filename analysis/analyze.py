@@ -46,6 +46,14 @@ def load_data(path: str) -> pd.DataFrame:
             colmap[col] = "total_time"
         elif "評価" in col:
             colmap[col] = "grade"
+        elif "ヒット" in col:
+            colmap[col] = "hits"
+        elif "見逃し" in col:
+            colmap[col] = "misses"
+        elif "フォルスアラーム" in col:
+            colmap[col] = "false_alarms"
+        elif "正棄却" in col:
+            colmap[col] = "correct_rejections"
     df = df.rename(columns=colmap)
 
     df["timestamp"] = pd.to_datetime(df["timestamp"])
@@ -56,9 +64,28 @@ def load_data(path: str) -> pd.DataFrame:
     df["accuracy"] = df["score"] / MAX_QUESTIONS * 100
     df["avg_time_per_q"] = df["total_time"] / MAX_QUESTIONS
 
+    sdt_cols = ["hits", "misses", "false_alarms", "correct_rejections"]
+    if all(c in df.columns for c in sdt_cols):
+        for c in sdt_cols:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+        df["d_prime"] = compute_d_prime(df["hits"], df["misses"], df["false_alarms"], df["correct_rejections"])
+    else:
+        print("注意: ヒット数/見逃し数/フォルスアラーム数/正棄却数の列が見つからないため、d′は計算しません"
+              "(Googleフォームにこれらの質問を追加し、スプレッドシートを再エクスポートしてください)。")
+
     df = df.sort_values(["name", "timestamp"])
     df["play_no"] = df.groupby("name").cumcount() + 1
     return df
+
+
+def compute_d_prime(hits, misses, false_alarms, correct_rejections):
+    """信号検出理論の感度指標 d′ = Z(ヒット率) - Z(フォルスアラーム率)。
+    0%/100%になるとZ変換できないため、loglinear補正(0.5を加える)を使う。"""
+    n_target_present = hits + misses
+    n_target_absent = false_alarms + correct_rejections
+    hit_rate = (hits + 0.5) / (n_target_present + 1)
+    fa_rate = (false_alarms + 0.5) / (n_target_absent + 1)
+    return stats.norm.ppf(hit_rate) - stats.norm.ppf(fa_rate)
 
 
 def analyze_learning_curve(df: pd.DataFrame, outdir: str) -> pd.DataFrame:
@@ -95,6 +122,23 @@ def analyze_learning_curve(df: pd.DataFrame, outdir: str) -> pd.DataFrame:
     sig = slopes.dropna(subset=["p_value"])
     n_sig_positive = ((sig["slope_per_play"] > 0) & (sig["p_value"] < 0.05)).sum()
     print(f"→ 有意に正の学習傾向(p<0.05)を示した参加者: {n_sig_positive} / {len(sig)} 人")
+
+    if "d_prime" in df.columns:
+        # 正答率だけでなくd′(応答バイアスを除いた純粋な知覚感度)でも学習曲線を見る
+        fig2, ax2 = plt.subplots(figsize=(8, 5))
+        for name, g in df.groupby("name"):
+            ax2.plot(g["play_no"], g["d_prime"], marker="o", alpha=0.4, label=name)
+        mean_d_curve = df.groupby("play_no")["d_prime"].mean()
+        ax2.plot(mean_d_curve.index, mean_d_curve.values, color="black", linewidth=3, marker="o", label="全体平均")
+        ax2.set_xlabel("プレイ回数(その人にとって何回目か)")
+        ax2.set_ylabel("d′ (感度)")
+        ax2.set_title("学習曲線: プレイ回数とd′の推移")
+        ax2.legend(fontsize=7, ncol=2, loc="lower right")
+        fig2.tight_layout()
+        fig2.savefig(os.path.join(outdir, "learning_curve_dprime.png"), dpi=150)
+        plt.close(fig2)
+        print("→ d′ベースの学習曲線を learning_curve_dprime.png に保存しました。")
+
     return slopes
 
 
@@ -131,6 +175,20 @@ def analyze_platform_comparison(df: pd.DataFrame, outdir: str) -> pd.DataFrame:
         print("→ p<0.05ならPCとVRで正答率に統計的に有意な差があると言える")
     else:
         print("PC・VR両方をプレイした参加者が2人未満のため、対応のある検定はスキップしました。")
+
+    if "d_prime" in df.columns:
+        per_person_platform_d = df.groupby(["name", "platform"])["d_prime"].mean().unstack()
+        paired_d = per_person_platform_d.dropna(subset=["PC", "VR"]) if {"PC", "VR"}.issubset(per_person_platform_d.columns) else pd.DataFrame()
+        print("\n=== C': PC vs VR (d′ベース、応答バイアスを除いた感度の比較) ===")
+        print(per_person_platform_d.to_string())
+        if len(paired_d) >= 2:
+            t_stat, t_p = stats.ttest_rel(paired_d["PC"], paired_d["VR"])
+            w_stat, w_p = stats.wilcoxon(paired_d["PC"], paired_d["VR"])
+            print(f"対応のあるt検定(d′): t={t_stat:.3f}, p={t_p:.4f} (n={len(paired_d)}人)")
+            print(f"Wilcoxonの符号順位検定(d′): W={w_stat:.3f}, p={w_p:.4f}")
+        else:
+            print("PC・VR両方をプレイした参加者が2人未満のため、d′の対応のある検定はスキップしました。")
+        per_person_platform_d.to_csv(os.path.join(outdir, "per_person_platform_dprime.csv"))
 
     return per_person_platform
 
