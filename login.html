@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン - ガボールパッチ・アイ・トレーナー</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .auth-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #007bff;
+            background: #fff;
+            color: #007bff;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        .auth-tab.active {
+            background: #007bff;
+            color: #fff;
+        }
+        .auth-form {
+            text-align: left;
+        }
+        .auth-form.hidden {
+            display: none;
+        }
+        .auth-form label {
+            display: block;
+            margin: 12px 0 4px;
+            font-weight: bold;
+            color: #333;
+        }
+        .auth-form input {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .auth-submit {
+            width: 100%;
+            margin-top: 20px;
+            padding: 12px;
+            background-color: #28a745;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+        .auth-submit:hover {
+            background-color: #218838;
+        }
+        .auth-error {
+            margin-top: 12px;
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .auth-note {
+            margin-top: 20px;
+            font-size: 0.85em;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>ガボールパッチ・アイ・トレーナー</h1>
+        <p>この端末で自分を識別するための、簡易的なログインです。</p>
+
+        <div class="auth-tabs">
+            <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">ログイン</button>
+            <button class="auth-tab" id="tab-register" onclick="switchTab('register')">新規登録</button>
+        </div>
+
+        <form class="auth-form" id="login-form" onsubmit="return handleLogin(event)">
+            <label for="login-name">お名前・ニックネーム</label>
+            <select id="login-name"></select>
+            <label for="login-password">パスワード</label>
+            <input type="password" id="login-password" autocomplete="off">
+            <button type="submit" class="auth-submit">ログイン</button>
+        </form>
+
+        <form class="auth-form hidden" id="register-form" onsubmit="return handleRegister(event)">
+            <label for="register-name">お名前・ニックネーム</label>
+            <input type="text" id="register-name" autocomplete="off">
+            <label for="register-password">パスワード</label>
+            <input type="password" id="register-password" autocomplete="off">
+            <button type="submit" class="auth-submit">登録してはじめる</button>
+        </form>
+
+        <p class="auth-error hidden" id="auth-error"></p>
+
+        <p class="auth-note">
+            ※このパスワードはこの端末の中だけで使われ、どこにも送信されません。
+            同じ端末を複数人で共有する場合に、名前の取り違えを防ぐためのものです。
+        </p>
+    </div>
+
+    <script src="auth.js"></script>
+    <script>
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const tabLogin = document.getElementById('tab-login');
+        const tabRegister = document.getElementById('tab-register');
+        const errorEl = document.getElementById('auth-error');
+        const loginNameSelect = document.getElementById('login-name');
+
+        function switchTab(mode) {
+            errorEl.classList.add('hidden');
+            if (mode === 'login') {
+                tabLogin.classList.add('active');
+                tabRegister.classList.remove('active');
+                loginForm.classList.remove('hidden');
+                registerForm.classList.add('hidden');
+            } else {
+                tabRegister.classList.add('active');
+                tabLogin.classList.remove('active');
+                registerForm.classList.remove('hidden');
+                loginForm.classList.add('hidden');
+            }
+        }
+
+        function populateLoginNames() {
+            const names = getRegisteredNames();
+            loginNameSelect.innerHTML = '';
+            if (names.length === 0) {
+                const opt = document.createElement('option');
+                opt.textContent = '登録済みの名前がありません';
+                opt.disabled = true;
+                loginNameSelect.appendChild(opt);
+                switchTab('register');
+                return;
+            }
+            names.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                loginNameSelect.appendChild(opt);
+            });
+        }
+
+        function showError(message) {
+            errorEl.textContent = message;
+            errorEl.classList.remove('hidden');
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            const name = loginNameSelect.value;
+            const password = document.getElementById('login-password').value;
+            const result = await loginAccount(name, password);
+            if (result.ok) {
+                window.location.href = 'index.html';
+            } else {
+                showError(result.error);
+            }
+            return false;
+        }
+
+        async function handleRegister(event) {
+            event.preventDefault();
+            const name = document.getElementById('register-name').value;
+            const password = document.getElementById('register-password').value;
+            const result = await registerAccount(name, password);
+            if (result.ok) {
+                window.location.href = 'index.html';
+            } else {
+                showError(result.error);
+            }
+            return false;
+        }
+
+        populateLoginNames();
+    </script>
+</body>
+</html>
