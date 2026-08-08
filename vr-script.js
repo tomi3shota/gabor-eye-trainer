@@ -85,12 +85,17 @@ function shuffleArray(array) {
 // Three.js セットアップ
 // =============================================================
 let renderer, scene, cameraRig, leftCamera, rightCamera;
-let uiPanel;
+let uiPanel, gameplayGroup;
 let targetMesh, patchMeshes = [];
 let btnYesMesh, btnNoMesh;
 let hudCanvas, hudCtx, hudTexture, hudMesh;
 let feedbackCanvas, feedbackCtx, feedbackTexture, feedbackMesh;
 let reticleLeftEl, reticleRightEl;
+
+// --- 結果画面（VR限定：ゴーグルを外さず視線で「もう一度プレイ」「ホームに戻る」を選べるようにする） ---
+let resultScreenActive = false;
+let resultGroup, resultTextCanvas, resultTextCtx, resultTextTexture, resultTextMesh;
+let retryMesh, homeMesh;
 
 const clock = new THREE.Clock();
 
@@ -147,6 +152,10 @@ function buildUiPanel() {
     uiPanel.position.set(0, 0, -PANEL_DISTANCE);
     scene.add(uiPanel);
 
+    // ゲームプレイ中のみ表示する要素をまとめておく（結果画面ではまとめて非表示にする）
+    gameplayGroup = new THREE.Object3D();
+    uiPanel.add(gameplayGroup);
+
     // --- HUD（スコア・問題数・タイマー）---
     hudCanvas = document.createElement('canvas');
     hudCanvas.width = 1024;
@@ -157,7 +166,7 @@ function buildUiPanel() {
     const hudMat = new THREE.MeshBasicMaterial({ map: hudTexture, transparent: true });
     hudMesh = new THREE.Mesh(hudGeo, hudMat);
     hudMesh.position.set(0, 1.05, 0);
-    uiPanel.add(hudMesh);
+    gameplayGroup.add(hudMesh);
     drawHud();
 
     // --- お題画像 ---
@@ -165,12 +174,12 @@ function buildUiPanel() {
     const targetMat = new THREE.MeshBasicMaterial({ color: 0x888888 });
     targetMesh = new THREE.Mesh(targetGeo, targetMat);
     targetMesh.position.set(-1.15, 0.55, 0);
-    uiPanel.add(targetMesh);
+    gameplayGroup.add(targetMesh);
 
     // お題ラベル
     const targetLabel = makeTextPlane('お題', 0.5, 0.12, { font: 'bold 60px Arial', color: '#ffffff', bg: 'rgba(0,123,255,0.85)' });
     targetLabel.position.set(-1.15, 0.87, 0.001);
-    uiPanel.add(targetLabel);
+    gameplayGroup.add(targetLabel);
 
     // お題エリアの背景カード（PC版の白カード風の見た目に合わせる）
     const targetBg = new THREE.Mesh(
@@ -178,7 +187,7 @@ function buildUiPanel() {
         new THREE.MeshBasicMaterial({ color: 0xffffff })
     );
     targetBg.position.set(-1.15, 0.55, -0.01);
-    uiPanel.add(targetBg);
+    gameplayGroup.add(targetBg);
 
     // --- 3x3 ガボールパッチグリッド ---
     const cols = 3, rows = 3;
@@ -195,7 +204,7 @@ function buildUiPanel() {
         new THREE.MeshBasicMaterial({ color: 0xf8f9fa })
     );
     gridBg.position.set(gridOriginX, gridOriginY, -0.01);
-    uiPanel.add(gridBg);
+    gameplayGroup.add(gridBg);
 
     patchMeshes = [];
     for (let r = 0; r < rows; r++) {
@@ -206,7 +215,7 @@ function buildUiPanel() {
             const x = gridOriginX - gridWidth / 2 + cellSize / 2 + c * (cellSize + gap);
             const y = gridOriginY + gridHeight / 2 - cellSize / 2 - r * (cellSize + gap);
             mesh.position.set(x, y, 0);
-            uiPanel.add(mesh);
+            gameplayGroup.add(mesh);
             patchMeshes.push(mesh);
         }
     }
@@ -214,11 +223,11 @@ function buildUiPanel() {
     // --- ある/ないボタン ---
     btnYesMesh = makeButtonPlane('ある！', 0x4CAF50);
     btnYesMesh.position.set(-1.15, -0.55, 0);
-    uiPanel.add(btnYesMesh);
+    gameplayGroup.add(btnYesMesh);
 
     btnNoMesh = makeButtonPlane('ない！', 0xF44336);
     btnNoMesh.position.set(-1.15, -0.9, 0);
-    uiPanel.add(btnNoMesh);
+    gameplayGroup.add(btnNoMesh);
 
     // --- フィードバック表示 ---
     feedbackCanvas = document.createElement('canvas');
@@ -230,7 +239,93 @@ function buildUiPanel() {
     const feedMat = new THREE.MeshBasicMaterial({ map: feedbackTexture, transparent: true });
     feedbackMesh = new THREE.Mesh(feedGeo, feedMat);
     feedbackMesh.position.set(0, -1.25, 0);
-    uiPanel.add(feedbackMesh);
+    gameplayGroup.add(feedbackMesh);
+
+    buildResultPanel();
+}
+
+// -------------------------------------------------------------
+// 結果画面パネル（VR限定）：スコア表示＋「もう一度プレイ」「ホームに戻る」を
+// ある/ないボタンと同じ視線滞留(dwell)方式で選べるようにする
+// -------------------------------------------------------------
+function buildResultPanel() {
+    resultGroup = new THREE.Object3D();
+    resultGroup.visible = false;
+    uiPanel.add(resultGroup);
+
+    resultTextCanvas = document.createElement('canvas');
+    resultTextCanvas.width = 1024;
+    resultTextCanvas.height = 560;
+    resultTextCtx = resultTextCanvas.getContext('2d');
+    resultTextTexture = new THREE.CanvasTexture(resultTextCanvas);
+    const resultGeo = new THREE.PlaneGeometry(1.9, 1.05);
+    const resultMat = new THREE.MeshBasicMaterial({ map: resultTextTexture, transparent: true });
+    resultTextMesh = new THREE.Mesh(resultGeo, resultMat);
+    resultTextMesh.position.set(0, 0.55, 0);
+    resultGroup.add(resultTextMesh);
+
+    // 結果テキストの背景カード
+    const resultBg = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.0, 1.15),
+        new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    resultBg.position.set(0, 0.55, -0.01);
+    resultGroup.add(resultBg);
+
+    const btnOpts = { width: 0.85, height: 0.32, canvasWidth: 768, canvasHeight: 280, fontSize: 60 };
+    retryMesh = makeButtonPlane('もう一度プレイ', 0x6f42c1, btnOpts);
+    retryMesh.position.set(-0.48, -0.55, 0);
+    resultGroup.add(retryMesh);
+
+    homeMesh = makeButtonPlane('ホームに戻る', 0x6c757d, btnOpts);
+    homeMesh.position.set(0.48, -0.55, 0);
+    resultGroup.add(homeMesh);
+}
+
+function drawResultText(grade) {
+    const w = resultTextCanvas.width, h = resultTextCanvas.height;
+    resultTextCtx.clearRect(0, 0, w, h);
+    resultTextCtx.textAlign = 'center';
+    resultTextCtx.textBaseline = 'middle';
+
+    resultTextCtx.fillStyle = '#222';
+    resultTextCtx.font = 'bold 64px Arial';
+    resultTextCtx.fillText('トレーニング終了！', w / 2, 80);
+
+    const accuracy = (correctScore / MAX_QUESTIONS * 100).toFixed(0);
+    resultTextCtx.font = '46px Arial';
+    resultTextCtx.fillText(`スコア: ${correctScore} / ${MAX_QUESTIONS} (${accuracy}%)`, w / 2, 220);
+    resultTextCtx.fillText(`総クリアタイム: ${totalClearTime.toFixed(1)}秒`, w / 2, 300);
+    resultTextCtx.fillText(`(平均 ${(totalClearTime / MAX_QUESTIONS).toFixed(1)}秒/問)`, w / 2, 370);
+
+    resultTextCtx.fillStyle = '#6f42c1';
+    resultTextCtx.font = 'bold 110px Arial';
+    resultTextCtx.fillText(`評価: ${grade}`, w / 2, 480);
+
+    resultTextTexture.needsUpdate = true;
+}
+
+// 結果画面の表示/非表示を切り替え、視線の滞留状態もリセットする
+function setResultScreen(active, grade) {
+    resultScreenActive = active;
+    resultGroup.visible = active;
+    gameplayGroup.visible = !active;
+    [btnYesMesh, btnNoMesh, retryMesh, homeMesh].forEach(mesh => {
+        if (!mesh) return;
+        mesh.userData.hovered = false;
+        mesh.userData.dwell = 0;
+        redrawButton(mesh);
+    });
+    if (active) drawResultText(grade);
+}
+
+function onResultRetry() {
+    setResultScreen(false);
+    startVrGame();
+}
+
+function onResultHome() {
+    window.location.href = 'vr-index.html';
 }
 
 function makeTextPlane(text, w, h, opts = {}) {
@@ -251,24 +346,24 @@ function makeTextPlane(text, w, h, opts = {}) {
     return new THREE.Mesh(geo, mat);
 }
 
-// 「ある/ない」ボタン：注視の滞留(dwell)進捗をバーで表示するため
+// 「ある/ない」等の注視選択ボタン：注視の滞留(dwell)進捗をバーで表示するため
 // canvasを都度再描画できるようにuserDataに情報を持たせる
-function makeButtonPlane(label, colorHex) {
+function makeButtonPlane(label, colorHex, opts = {}) {
     const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 220;
+    canvas.width = opts.canvasWidth || 512;
+    canvas.height = opts.canvasHeight || 220;
     const ctx = canvas.getContext('2d');
     const texture = new THREE.CanvasTexture(canvas);
-    const geo = new THREE.PlaneGeometry(0.5, 0.22);
+    const geo = new THREE.PlaneGeometry(opts.width || 0.5, opts.height || 0.22);
     const mat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.userData = { canvas, ctx, texture, label, colorHex, dwell: 0, hovered: false };
+    mesh.userData = { canvas, ctx, texture, label, colorHex, dwell: 0, hovered: false, fontSize: opts.fontSize || 90 };
     redrawButton(mesh);
     return mesh;
 }
 
 function redrawButton(mesh) {
-    const { canvas, ctx, label, colorHex, dwell, hovered } = mesh.userData;
+    const { canvas, ctx, label, colorHex, dwell, hovered, fontSize } = mesh.userData;
     const w = canvas.width, h = canvas.height;
     ctx.clearRect(0, 0, w, h);
 
@@ -283,7 +378,7 @@ function redrawButton(mesh) {
     ctx.stroke();
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 90px Arial';
+    ctx.font = `bold ${fontSize}px Arial`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(label, w / 2, h / 2 - 15);
@@ -456,19 +551,32 @@ const raycaster = new THREE.Raycaster();
 const rayOrigin = new THREE.Vector3();
 const rayDir = new THREE.Vector3();
 
+// 現在の画面状態（プレイ中 or 結果画面）に応じて、注視対象にするボタンを切り替える
+function getActiveGazeTargets() {
+    if (resultScreenActive) return [retryMesh, homeMesh].filter(Boolean);
+    if (gameActive && !answering) return [btnYesMesh, btnNoMesh].filter(Boolean);
+    return [];
+}
+
+function onGazeTargetSelected(mesh) {
+    if (mesh === btnYesMesh) triggerAnswer(true);
+    else if (mesh === btnNoMesh) triggerAnswer(false);
+    else if (mesh === retryMesh) onResultRetry();
+    else if (mesh === homeMesh) onResultHome();
+}
+
 function updateGazeInteraction(deltaMs) {
     cameraRig.getWorldPosition(rayOrigin);
     rayDir.set(0, 0, -1).applyQuaternion(cameraRig.getWorldQuaternion(new THREE.Quaternion()));
     raycaster.set(rayOrigin, rayDir);
 
-    const targets = [btnYesMesh, btnNoMesh].filter(Boolean);
-    const hits = gameActive && !answering && !orientationPaused ? raycaster.intersectObjects(targets) : [];
+    const targets = orientationPaused ? [] : getActiveGazeTargets();
+    const hits = raycaster.intersectObjects(targets);
     const hitMesh = hits.length > 0 ? hits[0].object : null;
 
     setReticleHover(!!hitMesh);
 
-    [btnYesMesh, btnNoMesh].forEach(mesh => {
-        if (!mesh) return;
+    targets.forEach(mesh => {
         const ud = mesh.userData;
         if (mesh === hitMesh) {
             if (!ud.hovered) {
@@ -481,7 +589,7 @@ function updateGazeInteraction(deltaMs) {
                 ud.dwell = 0;
                 ud.hovered = false;
                 redrawButton(mesh);
-                triggerAnswer(mesh === btnYesMesh);
+                onGazeTargetSelected(mesh);
             }
         } else if (ud.hovered || ud.dwell > 0) {
             ud.hovered = false;
@@ -495,14 +603,10 @@ function updateGazeInteraction(deltaMs) {
 
 let lastGazeHit = null;
 
-// 画面タップ／クリックでも即座に回答できるようにする（カードボードのタッチ穴経由の操作を想定）
+// 画面タップ／クリックでも即座に選択できるようにする（カードボードのタッチ穴経由の操作を想定）
 function onScreenTap() {
-    if (!gameActive || answering || !lastGazeHit) return;
-    if (lastGazeHit === btnYesMesh) {
-        triggerAnswer(true);
-    } else if (lastGazeHit === btnNoMesh) {
-        triggerAnswer(false);
-    }
+    if (!lastGazeHit) return;
+    onGazeTargetSelected(lastGazeHit);
 }
 
 // =============================================================
@@ -735,25 +839,9 @@ function endVrGame() {
         trialLog: trialLog
     });
 
-    showResultOverlay(grade);
-}
-
-function showResultOverlay(grade) {
-    const overlay = document.getElementById('start-overlay');
-    const accuracy = (correctScore / MAX_QUESTIONS * 100).toFixed(0);
-    overlay.innerHTML = `
-        <h1>🏁 トレーニング終了！</h1>
-        <p>スコア: ${correctScore} / ${MAX_QUESTIONS} (${accuracy}%)</p>
-        <p>総クリアタイム: ${totalClearTime.toFixed(1)}秒 (平均 ${(totalClearTime / MAX_QUESTIONS).toFixed(1)}秒/問)</p>
-        <p style="font-size:2em;font-weight:bold;">評価: ${grade}</p>
-        <button id="retry-btn" class="start-button" style="background:#6f42c1;border:none;">🔁 もう一度挑戦</button>
-        <a href="results.html" class="nav-button" style="margin-top:10px;">📊 履歴を見る</a>
-        <a href="vr-index.html" class="nav-button">🏠 難易度選択に戻る</a>
-    `;
-    overlay.classList.remove('hidden');
-    document.getElementById('retry-btn').addEventListener('click', () => {
-        startVrGame();
-    });
+    // 結果はVRゴーグルを外さず見られるよう3Dパネル上に表示し、
+    // 「もう一度プレイ」「ホームに戻る」も視線の滞留(dwell)で選べるようにする
+    setResultScreen(true, grade);
 }
 
 // =============================================================
