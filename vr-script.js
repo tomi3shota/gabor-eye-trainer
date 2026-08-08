@@ -33,6 +33,44 @@ let gameActive = false;
 let answering = false; // 二重回答防止
 let trialLog = []; // 問題単位のログ（信号検出理論のd′計算に使用）
 
+// --- 画面の向き制御 ---
+// screen.orientation.lock()はSafari(iOS)が未対応でサイレントに失敗するため、
+// 実際の向きを監視してゲート表示でブロックする方式を併用する。
+let orientationPaused = false;
+let pendingGameStart = false;
+
+function isPortrait() {
+    return window.matchMedia('(orientation: portrait)').matches;
+}
+
+// 縦向きならゲートを表示してゲームを一時停止、横向きに戻ったら自動再開する。
+function updateOrientationGate() {
+    const gate = document.getElementById('orientation-gate');
+    if (!gate) return;
+    const portrait = isPortrait();
+    gate.classList.toggle('hidden', !portrait);
+
+    if (portrait && gameActive && !orientationPaused) {
+        orientationPaused = true;
+        stopQuestionTimer();
+    } else if (!portrait && orientationPaused) {
+        orientationPaused = false;
+        if (gameActive) startQuestionTimer();
+    }
+
+    if (!portrait) tryStartPendingGame();
+}
+
+// 「VR開始」タップ後、横向きになるまでカウントダウンを保留する。
+function tryStartPendingGame() {
+    if (!pendingGameStart || isPortrait()) return;
+    pendingGameStart = false;
+    setTimeout(() => {
+        recenterView();
+        startVrGame();
+    }, 300);
+}
+
 // --- ユーティリティ ---
 function shuffleArray(array) {
     const shuffled = [...array];
@@ -424,7 +462,7 @@ function updateGazeInteraction(deltaMs) {
     raycaster.set(rayOrigin, rayDir);
 
     const targets = [btnYesMesh, btnNoMesh].filter(Boolean);
-    const hits = gameActive && !answering ? raycaster.intersectObjects(targets) : [];
+    const hits = gameActive && !answering && !orientationPaused ? raycaster.intersectObjects(targets) : [];
     const hitMesh = hits.length > 0 ? hits[0].object : null;
 
     setReticleHover(!!hitMesh);
@@ -764,6 +802,10 @@ window.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', onScreenTap);
     document.addEventListener('touchend', onScreenTap);
 
+    window.addEventListener('resize', updateOrientationGate);
+    window.addEventListener('orientationchange', updateOrientationGate);
+    updateOrientationGate();
+
     document.getElementById('enter-vr-btn').addEventListener('click', async () => {
         // フルスクリーン化（対応ブラウザのみ）
         try {
@@ -773,7 +815,8 @@ window.addEventListener('DOMContentLoaded', () => {
         } catch (e) {
             console.warn('フルスクリーン化に失敗:', e);
         }
-        // 横向き固定（対応ブラウザのみ。失敗しても続行）
+        // 横向き固定を試みる（Android Chrome等の対応ブラウザのみ有効。
+        // Safari(iOS)は非対応でここは失敗するため、下のゲート監視で担保する）
         try {
             if (screen.orientation && screen.orientation.lock) {
                 await screen.orientation.lock('landscape');
@@ -783,11 +826,10 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         onResize();
-        // 少し待ってセンサー値を安定させてからキャリブレーション
-        setTimeout(() => {
-            recenterView();
-            startVrGame();
-        }, 300);
+        updateOrientationGate();
+        // 縦向きのままならゲートで待機し、横向きになった時点で自動的に開始する
+        pendingGameStart = true;
+        tryStartPendingGame();
     });
 
     animate();

@@ -70,9 +70,49 @@
         .hidden {
             display: none !important;
         }
+        .orientation-gate {
+            position: fixed;
+            inset: 0;
+            background: #0a0a14;
+            color: #fff;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+        .orientation-gate.hidden {
+            display: none !important;
+        }
+        .orientation-gate .rotate-icon {
+            font-size: 3.2em;
+            margin-bottom: 16px;
+            animation: rotate-hint 1.6s ease-in-out infinite;
+        }
+        @keyframes rotate-hint {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(90deg); }
+        }
+        .orientation-gate p {
+            margin: 6px 0;
+        }
+        .orientation-gate .gate-sub {
+            font-size: 0.85em;
+            color: #ccc;
+            max-width: 380px;
+        }
     </style>
 </head>
 <body>
+
+    <div id="orientation-gate" class="orientation-gate hidden">
+        <div class="rotate-icon">📱↻</div>
+        <p>スマートフォンを<strong>横向き（ランドスケープ）</strong>にしてください</p>
+        <p class="gate-sub">向きが変わらない場合は、コントロールセンターなどで「縦向きのロック」をオフにしてから、もう一度横に回転してください。</p>
+    </div>
 
     <div id="start-overlay">
         <h1>🥽 VRモード準備完了</h1>

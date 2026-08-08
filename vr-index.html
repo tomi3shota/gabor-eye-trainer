@@ -32,9 +32,48 @@
         #permission-btn {
             display: none;
         }
+        .orientation-gate {
+            position: fixed;
+            inset: 0;
+            background: #0a0a14;
+            color: #fff;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+        .orientation-gate.hidden {
+            display: none;
+        }
+        .orientation-gate .rotate-icon {
+            font-size: 3.2em;
+            margin-bottom: 16px;
+            animation: rotate-hint 1.6s ease-in-out infinite;
+        }
+        @keyframes rotate-hint {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(90deg); }
+        }
+        .orientation-gate p {
+            margin: 6px 0;
+        }
+        .orientation-gate .gate-sub {
+            font-size: 0.85em;
+            color: #ccc;
+            max-width: 380px;
+        }
     </style>
 </head>
 <body>
+    <div id="orientation-gate" class="orientation-gate hidden">
+        <div class="rotate-icon">📱↻</div>
+        <p>スマートフォンを<strong>横向き（ランドスケープ）</strong>にしてください</p>
+        <p class="gate-sub">向きが変わらない場合は、コントロールセンターなどで「縦向きのロック」をオフにしてから、もう一度横に回転してください。</p>
+    </div>
     <div id="container">
         <div class="start-container">
             <h1>🥽 ガボールパッチ・アイ・トレーナー(VR版)</h1>
@@ -105,7 +144,20 @@
         const statusEl = document.getElementById('orientation-status');
         const permissionBtn = document.getElementById('permission-btn');
         const startButtons = document.querySelectorAll('.vr-start-btn');
+        const orientationGate = document.getElementById('orientation-gate');
         let sensorReady = false;
+
+        // 画面が縦向きの間はVR開始を完全にブロックする（オーバーレイが全画面を覆いタップを吸収する）。
+        // screen.orientation.lock()はSafari(iOS)が未対応のため、向きの検知でゲート表示する方式に統一。
+        function isPortrait() {
+            return window.matchMedia('(orientation: portrait)').matches;
+        }
+        function updateOrientationGate() {
+            orientationGate.classList.toggle('hidden', !isPortrait());
+        }
+        window.addEventListener('resize', updateOrientationGate);
+        window.addEventListener('orientationchange', updateOrientationGate);
+        updateOrientationGate();
 
         // iOS 13+ は明示的なユーザー操作でのpermission要求が必須。
         // Androidなど不要な環境では自動的に使用可能とみなす。
