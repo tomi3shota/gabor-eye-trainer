@@ -20,9 +20,16 @@
             <button onclick="resetGameHistory()" class="nav-button reset-button">🗑️ 履歴をリセット</button>
         </div>
 
-        <!-- 難易度・プラットフォームフィルター -->
+        <!-- フェーズ・難易度・プラットフォームフィルター -->
         <div class="filter-section">
-            <label for="difficulty-filter">難易度でフィルター:</label>
+            <label for="phase-filter">フェーズでフィルター:</label>
+            <select id="phase-filter" onchange="loadGameHistory()">
+                <option value="all">全てのフェーズ</option>
+                <option value="training">トレーニング</option>
+                <option value="pre_test">事前テスト</option>
+                <option value="post_test">事後テスト</option>
+            </select>
+            <label for="difficulty-filter" style="margin-left:15px;">難易度でフィルター:</label>
             <select id="difficulty-filter" onchange="loadGameHistory()">
                 <option value="all">全ての難易度</option>
                 <option value="beginner">初級</option>
@@ -101,33 +108,38 @@
         
         // ゲーム履歴を読み込み
         function loadGameHistory() {
+            const selectedPhase = document.getElementById('phase-filter').value;
             const selectedDifficulty = document.getElementById('difficulty-filter').value;
             const selectedPlatform = document.getElementById('platform-filter').value;
-            
+
             try {
                 const rawHistory = JSON.parse(localStorage.getItem('gaborGameHistory') || '[]');
-                // 過去のPC版データにはplatformフィールドが無いので、無い場合は'pc'とみなす（後方互換）
+                // 過去のデータにはplatform/phaseフィールドが無いので、無い場合は既定値とみなす（後方互換）
                 const allHistory = rawHistory.map(entry => ({
                     ...entry,
-                    platform: entry.platform || 'pc'
+                    platform: entry.platform || 'pc',
+                    phase: entry.phase || 'training'
                 }));
                 console.log('読み込んだ履歴:', allHistory); // デバッグ用
-                
-                // 難易度で絞った履歴（PC/VR比較グラフ用。プラットフォームでは絞らない）
+
+                // フェーズ＋難易度で絞った履歴（PC/VR比較グラフ用。プラットフォームでは絞らない）
                 let byDifficulty = allHistory;
-                if (selectedDifficulty !== 'all') {
-                    byDifficulty = allHistory.filter(entry => entry.difficulty === selectedDifficulty);
+                if (selectedPhase !== 'all') {
+                    byDifficulty = byDifficulty.filter(entry => entry.phase === selectedPhase);
                 }
-                
-                // 難易度＋プラットフォームでフィルター（統計カード・推移グラフ用）
+                if (selectedDifficulty !== 'all') {
+                    byDifficulty = byDifficulty.filter(entry => entry.difficulty === selectedDifficulty);
+                }
+
+                // フェーズ＋難易度＋プラットフォームでフィルター（統計カード・推移グラフ用）
                 let gameHistory = byDifficulty;
                 if (selectedPlatform !== 'all') {
                     gameHistory = byDifficulty.filter(entry => entry.platform === selectedPlatform);
                 }
-                
+
                 console.log('フィルター後の履歴:', gameHistory); // デバッグ用
-                
-                // PC vs VR 比較グラフは、データがある限り常に更新（難易度フィルターのみ反映）
+
+                // PC vs VR 比較グラフは、データがある限り常に更新（フェーズ・難易度フィルターのみ反映）
                 createComparisonChart(byDifficulty, selectedDifficulty);
                 
                 if (gameHistory.length === 0) {
@@ -346,8 +358,10 @@
             const avg = (arr, key) => arr.reduce((sum, e) => sum + (e[key] || 0), 0) / arr.length;
             const pcAccuracy = avg(pcEntries, 'accuracy');
             const vrAccuracy = avg(vrEntries, 'accuracy');
-            const pcTime = avg(pcEntries, 'totalTime') / MAX_Q_FALLBACK(pcEntries);
-            const vrTime = avg(vrEntries, 'totalTime') / MAX_Q_FALLBACK(vrEntries);
+            // トレーニング(10問)と事前/事後テスト(30問)が混在するため、1問あたりの時間は
+            // エントリーごとに正規化してから平均する（総時間を平均してから割ると問題数の違いで歪む）
+            const pcTime = avgPerQuestionTime(pcEntries);
+            const vrTime = avgPerQuestionTime(vrEntries);
             
             const diffText = difficultyLabel === 'all' ? '全難易度' :
                 { beginner: '初級', intermediate: '中級', advanced: '上級' }[difficultyLabel];
@@ -384,9 +398,12 @@
             });
         }
         
-        // 1問あたりの平均時間を出すための問題数（historyに保存されていないため10で固定。将来的にentry.totalQuestionsがあればそれを使う）
-        function MAX_Q_FALLBACK(entries) {
-            return 10;
+        // 1問あたりの平均回答時間（エントリーごとの問題数で正規化してから平均する。
+        // totalQuestionsが無い古いデータは10問だったとみなす）
+        function avgPerQuestionTime(entries) {
+            if (entries.length === 0) return 0;
+            const sum = entries.reduce((total, e) => total + (e.totalTime || 0) / (e.totalQuestions || 10), 0);
+            return sum / entries.length;
         }
         
         // スコア履歴をリセット

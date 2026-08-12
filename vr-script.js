@@ -6,20 +6,29 @@
 // =============================================================
 
 // --- 設定（PC版と同一） ---
-const MAX_QUESTIONS = 10;
+const TRAINING_QUESTIONS = 10; // 通常トレーニング1セットの問題数
+const TEST_QUESTIONS = 30;     // 事前/事後テスト1セットの問題数（休憩なしの1ブロック）
+let MAX_QUESTIONS = TRAINING_QUESTIONS; // フェーズに応じて動的に切り替える
+
 const PATCH_COUNT = 9;
 
+// 難易度は中級固定（参加者数が少なく難易度別の分析ができないため一本化した）
 const DIFFICULTY_SETTINGS = {
-    beginner: { timeLimit: 10, name: '初級' },
-    intermediate: { timeLimit: 5, name: '中級' },
-    advanced: { timeLimit: 3, name: '上級' }
+    intermediate: { timeLimit: 5, name: '中級' }
+};
+
+const PHASE_SETTINGS = {
+    training: { name: 'トレーニング', questions: TRAINING_QUESTIONS },
+    pre_test: { name: '事前テスト', questions: TEST_QUESTIONS },
+    post_test: { name: '事後テスト', questions: TEST_QUESTIONS }
 };
 
 const DWELL_TIME_MS = 1200; // 注視でボタンを選択するまでの時間
 
 // --- ゲーム状態 ---
-let currentDifficulty = 'beginner';
-let TIME_LIMIT = 10;
+let currentDifficulty = 'intermediate';
+let currentPhase = 'training'; // training / pre_test / post_test
+let TIME_LIMIT = 5;
 let currentQuestionNumber = 0;
 let correctScore = 0;
 let questionStartTime = 0;
@@ -290,7 +299,7 @@ function drawResultText(grade) {
 
     resultTextCtx.fillStyle = '#222';
     resultTextCtx.font = 'bold 64px Arial';
-    resultTextCtx.fillText('トレーニング終了！', w / 2, 80);
+    resultTextCtx.fillText(`${PHASE_SETTINGS[currentPhase].name}終了！`, w / 2, 80);
 
     const accuracy = (correctScore / MAX_QUESTIONS * 100).toFixed(0);
     resultTextCtx.font = '46px Arial';
@@ -427,8 +436,8 @@ function drawHud() {
     hudCtx.font = 'bold 54px Arial';
     hudCtx.textAlign = 'center';
     hudCtx.textBaseline = 'middle';
-    const diffName = DIFFICULTY_SETTINGS[currentDifficulty] ? DIFFICULTY_SETTINGS[currentDifficulty].name : '';
-    const text = `難易度:${diffName}　問題 ${currentQuestionNumber}/${MAX_QUESTIONS}　スコア ${correctScore}　残り ${remainingTime}秒`;
+    const phaseName = PHASE_SETTINGS[currentPhase] ? PHASE_SETTINGS[currentPhase].name : '';
+    const text = `${phaseName}　問題 ${currentQuestionNumber}/${MAX_QUESTIONS}　スコア ${correctScore}　残り ${remainingTime}秒`;
     hudCtx.fillText(text, w / 2, h / 2);
     hudTexture.needsUpdate = true;
 }
@@ -613,9 +622,14 @@ function onScreenTap() {
 // ゲームロジック（PC版 script.js と同等）
 // =============================================================
 async function startVrGame() {
-    const selectedDifficulty = localStorage.getItem('selectedDifficulty') || 'beginner';
-    currentDifficulty = selectedDifficulty;
-    TIME_LIMIT = DIFFICULTY_SETTINGS[selectedDifficulty].timeLimit;
+    // 難易度は中級固定
+    currentDifficulty = 'intermediate';
+    TIME_LIMIT = DIFFICULTY_SETTINGS.intermediate.timeLimit;
+
+    // フェーズ（training/pre_test/post_test）を読み込み、問題数を切り替える
+    const selectedPhase = localStorage.getItem('testPhase') || 'training';
+    currentPhase = PHASE_SETTINGS[selectedPhase] ? selectedPhase : 'training';
+    MAX_QUESTIONS = PHASE_SETTINGS[currentPhase].questions;
 
     currentQuestionNumber = 0;
     correctScore = 0;
@@ -824,6 +838,7 @@ function endVrGame() {
         accuracy: (correctScore / MAX_QUESTIONS) * 100,
         difficulty: currentDifficulty,
         totalQuestions: MAX_QUESTIONS,
+        phase: currentPhase, // training / pre_test / post_test
         platform: 'vr', // VR版であることを記録（PC版との比較用）
         trialLog: trialLog,
         signalDetection: sdt
@@ -832,6 +847,7 @@ function endVrGame() {
 
     submitScoreToGoogleForm({
         difficulty: currentDifficulty,
+        phase: currentPhase,
         platform: 'vr',
         score: correctScore,
         totalTime: totalClearTime,
@@ -878,11 +894,10 @@ window.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    const selectedDifficulty = localStorage.getItem('selectedDifficulty') || 'beginner';
-    const diffName = DIFFICULTY_SETTINGS[selectedDifficulty].name;
-    const diffTime = DIFFICULTY_SETTINGS[selectedDifficulty].timeLimit;
+    const selectedPhase = localStorage.getItem('testPhase') || 'training';
+    const phaseInfo = PHASE_SETTINGS[selectedPhase] || PHASE_SETTINGS.training;
     document.getElementById('difficulty-preview').textContent =
-        `難易度: ${diffName}（制限時間 ${diffTime}秒）`;
+        `${phaseInfo.name}（中級・制限時間 ${DIFFICULTY_SETTINGS.intermediate.timeLimit}秒・全${phaseInfo.questions}問）`;
 
     initThree();
 

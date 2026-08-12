@@ -1,20 +1,29 @@
 // --- 設定 ---
-const MAX_QUESTIONS = 10; // 1セットの問題数
+const TRAINING_QUESTIONS = 10; // 通常トレーニング1セットの問題数
+const TEST_QUESTIONS = 30;     // 事前/事後テスト1セットの問題数（休憩なしの1ブロック）
+let MAX_QUESTIONS = TRAINING_QUESTIONS; // フェーズに応じて動的に切り替える
+
 const PATCH_COUNT = 9;   // 画面に表示するガボールパッチの総数 (3x3=9)
 
-// 難易度設定
+// 難易度は中級固定（参加者数が少なく難易度別の分析ができないため一本化した）
 const DIFFICULTY_SETTINGS = {
-    beginner: { timeLimit: 10, name: '初級' },
-    intermediate: { timeLimit: 5, name: '中級' },
-    advanced: { timeLimit: 3, name: '上級' }
+    intermediate: { timeLimit: 5, name: '中級' }
 };
 
-let currentDifficulty = 'beginner'; // デフォルト難易度
-let TIME_LIMIT = 10; // 動的に変更される制限時間
+const PHASE_SETTINGS = {
+    training: { name: 'トレーニング', questions: TRAINING_QUESTIONS },
+    pre_test: { name: '事前テスト', questions: TEST_QUESTIONS },
+    post_test: { name: '事後テスト', questions: TEST_QUESTIONS }
+};
+
+let currentDifficulty = 'intermediate'; // 難易度は中級固定
+let currentPhase = 'training'; // training / pre_test / post_test
+let TIME_LIMIT = 5; // 動的に変更される制限時間
 
 // --- DOM要素 ---
 const gaborArea = document.getElementById('gabor-area');
 const scoreDisplay = document.getElementById('current-score');
+const maxQuestionsDisplay = document.getElementById('max-questions');
 const questionCountDisplay = document.getElementById('question-count');
 const feedbackElement = document.getElementById('feedback');
 const timerDisplay = document.getElementById('time-remaining');
@@ -80,20 +89,26 @@ async function startGame() {
     console.log('- countdownOverlay:', countdownOverlay ? '✅' : '❌');
     console.log('- countdownNumber:', countdownNumber ? '✅' : '❌');
     
-    // 難易度設定を読み込み
-    const selectedDifficulty = localStorage.getItem('selectedDifficulty') || 'beginner';
-    currentDifficulty = selectedDifficulty;
-    TIME_LIMIT = DIFFICULTY_SETTINGS[selectedDifficulty].timeLimit;
-    
-    console.log('選択された難易度:', selectedDifficulty);
-    console.log('制限時間:', TIME_LIMIT);
-    
-    // 難易度情報を表示
+    // 難易度は中級固定
+    currentDifficulty = 'intermediate';
+    TIME_LIMIT = DIFFICULTY_SETTINGS.intermediate.timeLimit;
+
+    // フェーズ（training/pre_test/post_test）を読み込み、問題数を切り替える
+    const selectedPhase = localStorage.getItem('testPhase') || 'training';
+    currentPhase = PHASE_SETTINGS[selectedPhase] ? selectedPhase : 'training';
+    MAX_QUESTIONS = PHASE_SETTINGS[currentPhase].questions;
+
+    console.log('フェーズ:', currentPhase, '問題数:', MAX_QUESTIONS, '制限時間:', TIME_LIMIT);
+
+    // モード情報を表示
     const difficultyInfo = document.getElementById('difficulty-info');
     if (difficultyInfo) {
-        difficultyInfo.textContent = `${DIFFICULTY_SETTINGS[selectedDifficulty].name} (制限時間: ${TIME_LIMIT}秒)`;
+        difficultyInfo.textContent = `${PHASE_SETTINGS[currentPhase].name}（中級・制限時間: ${TIME_LIMIT}秒・全${MAX_QUESTIONS}問）`;
     }
-    
+    if (maxQuestionsDisplay) {
+        maxQuestionsDisplay.textContent = MAX_QUESTIONS;
+    }
+
     // ゲーム状態をリセット
     currentQuestionNumber = 0;
     correctScore = 0;
@@ -104,7 +119,7 @@ async function startGame() {
     gameMainArea.classList.remove('hidden');
     resultArea.classList.add('hidden');
     
-    console.log(`ゲーム開始 - 難易度: ${DIFFICULTY_SETTINGS[selectedDifficulty].name}`);
+    console.log(`ゲーム開始 - フェーズ: ${PHASE_SETTINGS[currentPhase].name}`);
     
     // カウントダウンを表示してからゲーム開始
     showCountdown();
@@ -319,6 +334,8 @@ function endGame() {
         grade: grade,
         accuracy: (correctScore / MAX_QUESTIONS) * 100,
         difficulty: currentDifficulty,
+        totalQuestions: MAX_QUESTIONS,
+        phase: currentPhase, // training / pre_test / post_test
         platform: 'pc', // PC版であることを記録（VR版との比較用）
         trialLog: trialLog,
         signalDetection: sdt
@@ -328,6 +345,7 @@ function endGame() {
 
     submitScoreToGoogleForm({
         difficulty: currentDifficulty,
+        phase: currentPhase,
         platform: 'pc',
         score: correctScore,
         totalTime: totalClearTime,
@@ -337,7 +355,11 @@ function endGame() {
 
     gameMainArea.classList.add('hidden');
     resultArea.classList.remove('hidden');
-    
+
+    const resultHeading = document.getElementById('result-heading');
+    if (resultHeading) {
+        resultHeading.textContent = `${PHASE_SETTINGS[currentPhase].name}終了！`;
+    }
     finalScoreDisplay.textContent = `あなたのスコア: ${correctScore} / ${MAX_QUESTIONS} (${(correctScore / MAX_QUESTIONS * 100).toFixed(0)}%)`;
     finalTimeDisplay.textContent = `総クリアタイム: ${totalClearTime.toFixed(1)}秒 (平均: ${(totalClearTime / MAX_QUESTIONS).toFixed(1)}秒/問)`;
     finalGradeDisplay.textContent = `評価: ${grade}`;

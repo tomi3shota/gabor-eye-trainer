@@ -22,38 +22,38 @@
                     <li>🔍 <strong>9個の画像</strong>の中からお題と同じものを探します</li>
                     <li>✅ 同じ画像が<strong>ある場合は「ある！」</strong>をクリック</li>
                     <li>❌ 同じ画像が<strong>ない場合は「ない！」</strong>をクリック</li>
-                    <li>⏰ <strong>制限時間内</strong>に答えてください（難易度により異なります）</li>
-                    <li>📝 <strong>10問</strong>で1セット完了です</li>
+                    <li>⏰ <strong>制限時間5秒</strong>以内に答えてください</li>
+                    <li>📝 通常のトレーニングは<strong>10問</strong>で1セット完了です</li>
                 </ul>
             </div>
-            
-            <!-- 難易度選択 -->
+
+            <!-- モード選択 -->
             <div class="difficulty-selection">
-                <h2>🎮 難易度を選択してゲーム開始</h2>
+                <h2>🎮 モードを選んで開始</h2>
                 <div class="difficulty-cards">
-                    <button class="difficulty-card beginner" onclick="startGame('beginner')">
-                        <h3>🟢 初級</h3>
-                        <p>制限時間: 10秒</p>
-                        <p>初心者向け・ゆっくり考える</p>
+                    <button class="difficulty-card intermediate" onclick="startGame('training')">
+                        <h3>▶️ トレーニング</h3>
+                        <p>10問・制限時間5秒</p>
+                        <p>いつもの練習</p>
                         <div class="start-text">クリックして開始</div>
                     </button>
-                    
-                    <button class="difficulty-card intermediate" onclick="startGame('intermediate')">
-                        <h3>🟡 中級</h3>
-                        <p>制限時間: 5秒</p>
-                        <p>慣れてきた方向け</p>
+
+                    <button class="difficulty-card beginner" onclick="startGame('pre_test')">
+                        <h3>📋 事前テスト</h3>
+                        <p>30問・休憩なしの1セット</p>
+                        <p>トレーニング期間の前に1回</p>
                         <div class="start-text">クリックして開始</div>
                     </button>
-                    
-                    <button class="difficulty-card advanced" onclick="startGame('advanced')">
-                        <h3>🔴 上級</h3>
-                        <p>制限時間: 3秒</p>
-                        <p>エキスパート向け・瞬間判断</p>
+
+                    <button class="difficulty-card advanced" onclick="startGame('post_test')">
+                        <h3>🏁 事後テスト</h3>
+                        <p>30問・休憩なしの1セット</p>
+                        <p>トレーニング期間の後に1回</p>
                         <div class="start-text">クリックして開始</div>
                     </button>
                 </div>
             </div>
-            
+
             <div class="navigation">
                 <a href="results.html" class="nav-button">📊 スコア履歴を見る</a>
                 <a href="vr-index.html" class="nav-button vr-nav-button">🥽 VR版で挑戦</a>
@@ -69,9 +69,10 @@
                 `${getCurrentUser()} さんとしてプレイ中　<a href="#" onclick="logout(); return false;">ログアウト</a>`;
         }
 
-        function startGame(difficulty) {
-            // 選択した難易度をローカルストレージに保存
-            localStorage.setItem('selectedDifficulty', difficulty);
+        function startGame(phase) {
+            // 難易度は中級固定。フェーズ（training/pre_test/post_test）だけ選択してもらう
+            localStorage.setItem('selectedDifficulty', 'intermediate');
+            localStorage.setItem('testPhase', phase);
             // ゲームページに移動
             window.location.href = 'game.html';
         }

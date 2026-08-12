@@ -13,7 +13,9 @@ const GOOGLE_FORM_ENTRIES = {
     hits: 'entry.1336681947',
     misses: 'entry.488010692',
     falseAlarms: 'entry.1193150678',
-    correctRejections: 'entry.876648791'
+    correctRejections: 'entry.876648791',
+    // 事前/事後テスト分析用
+    phase: 'entry.1081409985'
 };
 
 const DIFFICULTY_LABELS = {
@@ -25,6 +27,12 @@ const DIFFICULTY_LABELS = {
 const PLATFORM_LABELS = {
     pc: 'PC',
     vr: 'VR'
+};
+
+const PHASE_LABELS = {
+    training: '通常トレーニング',
+    pre_test: '事前テスト',
+    post_test: '事後テスト'
 };
 
 // 問題単位のログ(trialLog)から、信号検出理論(d′)計算に必要な4分類を集計する
@@ -45,7 +53,7 @@ function getPlayerName() {
     return getCurrentUser() || '匿名';
 }
 
-function submitScoreToGoogleForm({ difficulty, platform, score, totalTime, grade, trialLog }) {
+function submitScoreToGoogleForm({ difficulty, phase, platform, score, totalTime, grade, trialLog }) {
     const formData = new FormData();
     formData.append(GOOGLE_FORM_ENTRIES.name, getPlayerName());
     formData.append(GOOGLE_FORM_ENTRIES.difficulty, DIFFICULTY_LABELS[difficulty] || difficulty);
@@ -53,6 +61,11 @@ function submitScoreToGoogleForm({ difficulty, platform, score, totalTime, grade
     formData.append(GOOGLE_FORM_ENTRIES.score, String(score));
     formData.append(GOOGLE_FORM_ENTRIES.totalTime, totalTime.toFixed(1));
     formData.append(GOOGLE_FORM_ENTRIES.grade, grade);
+
+    // Googleフォームに「フェーズ」の設問を追加してentry IDを設定するまでは送信をスキップする
+    if (GOOGLE_FORM_ENTRIES.phase) {
+        formData.append(GOOGLE_FORM_ENTRIES.phase, PHASE_LABELS[phase] || phase);
+    }
 
     if (Array.isArray(trialLog) && trialLog.length > 0) {
         const sdt = computeSignalDetectionCounts(trialLog);

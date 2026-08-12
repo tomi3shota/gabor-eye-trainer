@@ -91,7 +91,7 @@
             <ol class="vr-steps">
                 <li>スマートフォンを<strong>横向き（ランドスケープ）</strong>にしてください</li>
                 <li>下の「📱 センサーの使用を許可」ボタンをタップし、モーションセンサーへのアクセスを許可してください</li>
-                <li>難易度を選んで「VR開始」をタップすると全画面のステレオ（2眼）表示になります</li>
+                <li>モードを選んで「VR開始」をタップすると全画面のステレオ（2眼）表示になります</li>
                 <li>スマホをカードボードゴーグルに装着してください</li>
                 <li>画面中央の照準（レティクル）を「ある/ない」に向けたまま<strong>約1.2秒見つめる</strong>と回答できます（画面タップでも回答可）</li>
             </ol>
@@ -99,28 +99,28 @@
             <button id="permission-btn" class="start-button" onclick="requestSensorPermission()">📱 センサーの使用を許可</button>
             <p id="orientation-status"></p>
 
-            <!-- 難易度選択 -->
+            <!-- モード選択 -->
             <div class="difficulty-selection">
-                <h2>🎮 難易度を選択してVR開始</h2>
+                <h2>🎮 モードを選んでVR開始</h2>
                 <div class="difficulty-cards">
-                    <button class="difficulty-card beginner vr-start-btn" data-difficulty="beginner" disabled>
-                        <h3>🟢 初級</h3>
-                        <p>制限時間: 10秒</p>
-                        <p>初心者向け・ゆっくり考える</p>
+                    <button class="difficulty-card intermediate vr-start-btn" data-phase="training" disabled>
+                        <h3>▶️ トレーニング</h3>
+                        <p>10問・制限時間5秒</p>
+                        <p>いつもの練習</p>
                         <div class="start-text">VR開始</div>
                     </button>
 
-                    <button class="difficulty-card intermediate vr-start-btn" data-difficulty="intermediate" disabled>
-                        <h3>🟡 中級</h3>
-                        <p>制限時間: 5秒</p>
-                        <p>慣れてきた方向け</p>
+                    <button class="difficulty-card beginner vr-start-btn" data-phase="pre_test" disabled>
+                        <h3>📋 事前テスト</h3>
+                        <p>30問・休憩なしの1セット</p>
+                        <p>トレーニング期間の前に1回</p>
                         <div class="start-text">VR開始</div>
                     </button>
 
-                    <button class="difficulty-card advanced vr-start-btn" data-difficulty="advanced" disabled>
-                        <h3>🔴 上級</h3>
-                        <p>制限時間: 3秒</p>
-                        <p>エキスパート向け・瞬間判断</p>
+                    <button class="difficulty-card advanced vr-start-btn" data-phase="post_test" disabled>
+                        <h3>🏁 事後テスト</h3>
+                        <p>30問・休憩なしの1セット</p>
+                        <p>トレーニング期間の後に1回</p>
                         <div class="start-text">VR開始</div>
                     </button>
                 </div>
@@ -168,7 +168,7 @@
 
         function enableStartButtons() {
             sensorReady = true;
-            statusEl.textContent = '✅ センサーの準備ができました。難易度を選んでください。';
+            statusEl.textContent = '✅ センサーの準備ができました。モードを選んでください。';
             statusEl.style.color = '#28a745';
             startButtons.forEach(btn => btn.disabled = false);
         }
@@ -208,8 +208,10 @@
         startButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 if (!sensorReady) return;
-                const difficulty = btn.getAttribute('data-difficulty');
-                localStorage.setItem('selectedDifficulty', difficulty);
+                const phase = btn.getAttribute('data-phase');
+                // 難易度は中級固定。フェーズ（training/pre_test/post_test）だけ選択してもらう
+                localStorage.setItem('selectedDifficulty', 'intermediate');
+                localStorage.setItem('testPhase', phase);
                 window.location.href = 'vr-game.html';
             });
         });
