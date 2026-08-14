@@ -52,19 +52,21 @@ function isPortrait() {
     return window.matchMedia('(orientation: portrait)').matches;
 }
 
-// 縦向きならゲートを表示してゲームを一時停止、横向きに戻ったら自動再開する。
+// 縦向きなら（スタート画面/結果画面/プレイ中どれでも）ゲートを表示して視線操作をブロックし、
+// 横向きに戻ったら自動再開する。
 function updateOrientationGate() {
     const gate = document.getElementById('orientation-gate');
     if (!gate) return;
     const portrait = isPortrait();
     gate.classList.toggle('hidden', !portrait);
 
-    if (portrait && gameActive && !orientationPaused) {
-        orientationPaused = true;
+    const wasPaused = orientationPaused;
+    orientationPaused = portrait;
+
+    if (portrait && !wasPaused && gameActive) {
         stopQuestionTimer();
-    } else if (!portrait && orientationPaused) {
-        orientationPaused = false;
-        if (gameActive) startQuestionTimer();
+    } else if (!portrait && wasPaused && gameActive) {
+        startQuestionTimer();
     }
 
     if (!portrait) tryStartPendingGame();
@@ -100,6 +102,11 @@ let btnYesMesh, btnNoMesh;
 let hudCanvas, hudCtx, hudTexture, hudMesh;
 let feedbackCanvas, feedbackCtx, feedbackTexture, feedbackMesh;
 let reticleLeftEl, reticleRightEl;
+
+// --- スタート画面（VR限定：ゴーグルを外さず視線で「VR開始」を選べるようにする） ---
+let startScreenActive = true;
+let startGroup, startTextCanvas, startTextCtx, startTextTexture, startTextMesh;
+let startMesh;
 
 // --- 結果画面（VR限定：ゴーグルを外さず視線で「もう一度プレイ」「ホームに戻る」を選べるようにする） ---
 let resultScreenActive = false;
@@ -251,6 +258,67 @@ function buildUiPanel() {
     gameplayGroup.add(feedbackMesh);
 
     buildResultPanel();
+    buildStartPanel();
+
+    // 初期状態はスタート画面のみ表示（ゲームプレイ用の要素はまだ隠す）
+    gameplayGroup.visible = false;
+    startGroup.visible = true;
+}
+
+// -------------------------------------------------------------
+// スタート画面パネル（VR限定）：「VR開始」をある/ないボタンと同じ
+// 視線滞留(dwell)方式で選べるようにする（準備中にタッチ操作が不便なため）
+// -------------------------------------------------------------
+function buildStartPanel() {
+    startGroup = new THREE.Object3D();
+    uiPanel.add(startGroup);
+
+    startTextCanvas = document.createElement('canvas');
+    startTextCanvas.width = 1024;
+    startTextCanvas.height = 460;
+    startTextCtx = startTextCanvas.getContext('2d');
+    startTextTexture = new THREE.CanvasTexture(startTextCanvas);
+    const startTextGeo = new THREE.PlaneGeometry(1.9, 0.86);
+    const startTextMat = new THREE.MeshBasicMaterial({ map: startTextTexture, transparent: true });
+    startTextMesh = new THREE.Mesh(startTextGeo, startTextMat);
+    startTextMesh.position.set(0, 0.42, 0);
+    startGroup.add(startTextMesh);
+
+    const startBg = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.0, 0.96),
+        new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    startBg.position.set(0, 0.42, -0.01);
+    startGroup.add(startBg);
+
+    startMesh = makeButtonPlane('VR開始', 0x6f42c1, { width: 1.2, height: 0.4, canvasWidth: 860, canvasHeight: 290, fontSize: 70 });
+    startMesh.position.set(0, -0.45, 0);
+    startGroup.add(startMesh);
+}
+
+function drawStartText() {
+    const w = startTextCanvas.width, h = startTextCanvas.height;
+    startTextCtx.clearRect(0, 0, w, h);
+    startTextCtx.textAlign = 'center';
+    startTextCtx.textBaseline = 'middle';
+
+    startTextCtx.fillStyle = '#222';
+    startTextCtx.font = 'bold 56px Arial';
+    startTextCtx.fillText('VRモード準備完了', w / 2, 70);
+
+    const selectedPhase = localStorage.getItem('testPhase') || 'training';
+    const phaseInfo = PHASE_SETTINGS[selectedPhase] || PHASE_SETTINGS.training;
+    startTextCtx.font = 'bold 44px Arial';
+    startTextCtx.fillStyle = '#6f42c1';
+    startTextCtx.fillText(`${phaseInfo.name}（中級・全${phaseInfo.questions}問）`, w / 2, 160);
+
+    startTextCtx.font = '32px Arial';
+    startTextCtx.fillStyle = '#444';
+    startTextCtx.fillText('下のボタンを見つめる（約1.2秒）か', w / 2, 250);
+    startTextCtx.fillText('画面をタップすると開始します', w / 2, 300);
+    startTextCtx.fillText('開始後、スマホをゴーグルにセットしてください', w / 2, 370);
+
+    startTextTexture.needsUpdate = true;
 }
 
 // -------------------------------------------------------------
@@ -335,6 +403,42 @@ function onResultRetry() {
 
 function onResultHome() {
     window.location.href = 'vr-index.html';
+}
+
+// 「VR開始」が選ばれた時の処理（視線での滞留選択・タップのどちらからも呼ばれる）
+async function onStartSelected() {
+    if (!startScreenActive) return; // 二重発火防止
+    startScreenActive = false;
+    startGroup.visible = false;
+    gameplayGroup.visible = true;
+    if (startMesh) {
+        startMesh.userData.hovered = false;
+        startMesh.userData.dwell = 0;
+        redrawButton(startMesh);
+    }
+
+    // フルスクリーン化（対応ブラウザのみ）。視線での選択はブラウザのユーザー操作制約により
+    // フルスクリーン化・画面向き固定が失敗することがあるが、その場合も後段の処理は続行する
+    try {
+        if (document.documentElement.requestFullscreen) {
+            await document.documentElement.requestFullscreen();
+        }
+    } catch (e) {
+        console.warn('フルスクリーン化に失敗:', e);
+    }
+    try {
+        if (screen.orientation && screen.orientation.lock) {
+            await screen.orientation.lock('landscape');
+        }
+    } catch (e) {
+        console.warn('画面の向き固定に失敗:', e);
+    }
+
+    onResize();
+    updateOrientationGate();
+    // 縦向きのままならゲートで待機し、横向きになった時点で自動的に開始する
+    pendingGameStart = true;
+    tryStartPendingGame();
 }
 
 function makeTextPlane(text, w, h, opts = {}) {
@@ -534,10 +638,14 @@ function setQuaternionFromDeviceOrientation(quaternion, alpha, beta, gamma, scre
 
 function onDeviceOrientation(event) {
     if (event.alpha === null) return;
+    const firstReading = !orientationAvailable;
     currentAlpha = event.alpha || 0;
     currentBeta = event.beta || 0;
     currentGamma = event.gamma || 0;
     orientationAvailable = true;
+    // センサーが初めて値を返した時点で一度基準方向を合わせておくと、
+    // スタート画面のボタンが最初から見やすい位置に出やすくなる
+    if (firstReading) recenterView();
 }
 
 function recenterView() {
@@ -560,8 +668,9 @@ const raycaster = new THREE.Raycaster();
 const rayOrigin = new THREE.Vector3();
 const rayDir = new THREE.Vector3();
 
-// 現在の画面状態（プレイ中 or 結果画面）に応じて、注視対象にするボタンを切り替える
+// 現在の画面状態（スタート画面 or プレイ中 or 結果画面）に応じて、注視対象にするボタンを切り替える
 function getActiveGazeTargets() {
+    if (startScreenActive) return [startMesh].filter(Boolean);
     if (resultScreenActive) return [retryMesh, homeMesh].filter(Boolean);
     if (gameActive && !answering) return [btnYesMesh, btnNoMesh].filter(Boolean);
     return [];
@@ -572,6 +681,7 @@ function onGazeTargetSelected(mesh) {
     else if (mesh === btnNoMesh) triggerAnswer(false);
     else if (mesh === retryMesh) onResultRetry();
     else if (mesh === homeMesh) onResultHome();
+    else if (mesh === startMesh) onStartSelected();
 }
 
 function updateGazeInteraction(deltaMs) {
@@ -870,10 +980,15 @@ function animate() {
     updateCameraRigFromOrientation();
     lastGazeHit = updateGazeInteraction(deltaMs);
 
-    renderer.setScissorTest(true);
-    renderer.clear();
-
     const width = window.innerWidth, height = window.innerHeight;
+
+    // clear()は直前に設定されたシザー範囲だけを対象にするため、まず全画面分の
+    // シザーに戻してからクリアする（そうしないと片目側だけ前フレームの内容が
+    // 残り、背景が黒くなるなどの表示崩れが起きる）
+    renderer.setScissorTest(true);
+    renderer.setViewport(0, 0, width, height);
+    renderer.setScissor(0, 0, width, height);
+    renderer.clear();
 
     renderer.setViewport(0, 0, width / 2, height);
     renderer.setScissor(0, 0, width / 2, height);
@@ -894,12 +1009,8 @@ window.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    const selectedPhase = localStorage.getItem('testPhase') || 'training';
-    const phaseInfo = PHASE_SETTINGS[selectedPhase] || PHASE_SETTINGS.training;
-    document.getElementById('difficulty-preview').textContent =
-        `${phaseInfo.name}（中級・制限時間 ${DIFFICULTY_SETTINGS.intermediate.timeLimit}秒・全${phaseInfo.questions}問）`;
-
     initThree();
+    drawStartText();
 
     window.addEventListener('deviceorientation', onDeviceOrientation, true);
     document.addEventListener('click', onScreenTap);
@@ -909,31 +1020,13 @@ window.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('orientationchange', updateOrientationGate);
     updateOrientationGate();
 
-    document.getElementById('enter-vr-btn').addEventListener('click', async () => {
-        // フルスクリーン化（対応ブラウザのみ）
-        try {
-            if (document.documentElement.requestFullscreen) {
-                await document.documentElement.requestFullscreen();
-            }
-        } catch (e) {
-            console.warn('フルスクリーン化に失敗:', e);
-        }
-        // 横向き固定を試みる（Android Chrome等の対応ブラウザのみ有効。
-        // Safari(iOS)は非対応でここは失敗するため、下のゲート監視で担保する）
-        try {
-            if (screen.orientation && screen.orientation.lock) {
-                await screen.orientation.lock('landscape');
-            }
-        } catch (e) {
-            console.warn('画面の向き固定に失敗:', e);
-        }
+    const recenterBtn = document.getElementById('recenter-btn');
+    if (recenterBtn) {
+        recenterBtn.addEventListener('click', () => recenterView());
+    }
 
-        onResize();
-        updateOrientationGate();
-        // 縦向きのままならゲートで待機し、横向きになった時点で自動的に開始する
-        pendingGameStart = true;
-        tryStartPendingGame();
-    });
+    // 読み込み中オーバーレイを消し、スタート画面（3Dパネル）に切り替える
+    document.getElementById('start-overlay').classList.add('hidden');
 
     animate();
 });

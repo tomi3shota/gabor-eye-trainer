@@ -42,23 +42,9 @@
             max-width: 420px;
             line-height: 1.6;
         }
-        #enter-vr-btn {
-            margin-top: 20px;
-            padding: 16px 32px;
-            font-size: 1.1em;
-            background: #6f42c1;
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-        }
-        #enter-vr-btn:active {
-            background: #59339d;
-        }
-        #exit-vr-btn {
+        #exit-vr-btn, #recenter-btn {
             position: fixed;
             top: 10px;
-            left: 10px;
             z-index: 50;
             background: rgba(0,0,0,0.5);
             color: #fff;
@@ -66,6 +52,16 @@
             border-radius: 6px;
             padding: 8px 14px;
             font-size: 0.85em;
+        }
+        #exit-vr-btn {
+            left: 10px;
+        }
+        #recenter-btn {
+            right: 10px;
+            cursor: pointer;
+        }
+        #recenter-btn:active {
+            background: rgba(111, 66, 193, 0.7);
         }
         .hidden {
             display: none !important;
@@ -115,14 +111,11 @@
     </div>
 
     <div id="start-overlay">
-        <h1>🥽 VRモード準備完了</h1>
-        <p>スマホを横向きにして「VR開始」をタップすると全画面のステレオ表示になります。<br>
-        タップ後、スマホをカードボードゴーグルにセットしてください。</p>
-        <p id="difficulty-preview" style="font-weight:bold;"></p>
-        <button id="enter-vr-btn">▶ VR開始</button>
+        <h1>🥽 読み込み中...</h1>
     </div>
 
     <a id="exit-vr-btn" href="vr-index.html">✕ 終了</a>
+    <a id="recenter-btn">🔄 視点リセット</a>
 
     <canvas id="vr-canvas"></canvas>
 
