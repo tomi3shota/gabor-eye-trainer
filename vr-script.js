@@ -115,8 +115,34 @@ let retryMesh, homeMesh;
 
 const clock = new THREE.Clock();
 
-const IPD = 0.064; // 瞳孔間距離(m)の近似値
+// --- 目の間隔(IPD)調整 ---
+// ダンボールゴーグルのレンズ間隔は機種・スマホごとにバラつきがあり、左右の映像が
+// 綺麗に重ならないことがあるため、その場でプレイヤーが微調整できるようにする。
+// 調整値は端末ごとにlocalStorageへ保存し、次回以降も引き継ぐ。
+const DEFAULT_IPD = 0.064; // 瞳孔間距離(m)の近似値
+const IPD_STEP = 0.002;
+const IPD_MIN = 0.02;
+const IPD_MAX = 0.12;
+
+function loadStoredIPD() {
+    const stored = parseFloat(localStorage.getItem('vrEyeSeparation'));
+    return Number.isFinite(stored) ? Math.min(IPD_MAX, Math.max(IPD_MIN, stored)) : DEFAULT_IPD;
+}
+
+let IPD = loadStoredIPD();
 const PANEL_DISTANCE = 2.5; // パネルまでの距離(m)
+
+// 現在のIPD値を左右カメラの位置に反映する
+function applyIPD() {
+    if (leftCamera) leftCamera.position.x = -IPD / 2;
+    if (rightCamera) rightCamera.position.x = IPD / 2;
+}
+
+function adjustIPD(delta) {
+    IPD = Math.min(IPD_MAX, Math.max(IPD_MIN, IPD + delta));
+    applyIPD();
+    localStorage.setItem('vrEyeSeparation', IPD.toFixed(4));
+}
 
 function initThree() {
     const canvas = document.getElementById('vr-canvas');
@@ -131,12 +157,12 @@ function initThree() {
     scene.add(cameraRig);
 
     leftCamera = new THREE.PerspectiveCamera(70, 1, 0.05, 50);
-    leftCamera.position.set(-IPD / 2, 0, 0);
     cameraRig.add(leftCamera);
 
     rightCamera = new THREE.PerspectiveCamera(70, 1, 0.05, 50);
-    rightCamera.position.set(IPD / 2, 0, 0);
     cameraRig.add(rightCamera);
+
+    applyIPD();
 
     // 環境光的な補助光（MeshBasicMaterialを主に使うため必須ではないが保険）
     scene.add(new THREE.AmbientLight(0xffffff, 1.0));
@@ -1024,6 +1050,11 @@ window.addEventListener('DOMContentLoaded', () => {
     if (recenterBtn) {
         recenterBtn.addEventListener('click', () => recenterView());
     }
+
+    const ipdMinusBtn = document.getElementById('ipd-minus-btn');
+    const ipdPlusBtn = document.getElementById('ipd-plus-btn');
+    if (ipdMinusBtn) ipdMinusBtn.addEventListener('click', () => adjustIPD(-IPD_STEP));
+    if (ipdPlusBtn) ipdPlusBtn.addEventListener('click', () => adjustIPD(IPD_STEP));
 
     // 読み込み中オーバーレイを消し、スタート画面（3Dパネル）に切り替える
     document.getElementById('start-overlay').classList.add('hidden');

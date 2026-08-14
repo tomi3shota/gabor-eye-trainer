@@ -63,6 +63,39 @@
         #recenter-btn:active {
             background: rgba(111, 66, 193, 0.7);
         }
+        #ipd-controls {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0,0,0,0.5);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.4);
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 0.8em;
+        }
+        #ipd-controls span {
+            white-space: nowrap;
+        }
+        #ipd-minus-btn, #ipd-plus-btn {
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 6px;
+            width: 34px;
+            height: 34px;
+            font-size: 1.1em;
+            line-height: 1;
+            cursor: pointer;
+        }
+        #ipd-minus-btn:active, #ipd-plus-btn:active {
+            background: rgba(111, 66, 193, 0.7);
+        }
         .hidden {
             display: none !important;
         }
@@ -116,6 +149,11 @@
 
     <a id="exit-vr-btn" href="vr-index.html">✕ 終了</a>
     <a id="recenter-btn">🔄 視点リセット</a>
+    <div id="ipd-controls">
+        <button id="ipd-minus-btn" aria-label="目の間隔をせまく">−</button>
+        <span>目の間隔</span>
+        <button id="ipd-plus-btn" aria-label="目の間隔をひろく">＋</button>
+    </div>
 
     <canvas id="vr-canvas"></canvas>
 
