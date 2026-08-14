@@ -196,7 +196,10 @@ function generateQuestion() {
  * 表示用の永続canvasを初回だけ作成する（毎問題ごとに<img>を作り直さず使い回す）
  */
 function ensureDisplayCanvases() {
-    if (targetImageElement.width !== 300) {
+    // canvasは属性未指定だとデフォルトでwidth=300,height=150になる。
+    // widthだけを条件にすると偶然300のままheightだけ150で放置され続けてしまう
+    // ため、正方形かどうかで判定する（=毎回同じ値を入れ直すのは無害なので簡略化）。
+    if (targetImageElement.width !== 300 || targetImageElement.height !== 300) {
         targetImageElement.width = 300;
         targetImageElement.height = 300;
     }
