@@ -48,6 +48,7 @@ let targetConfig = null;
 let hasTarget = false;
 let gaborPatches = [];
 let trialLog = []; // 問題単位のログ（信号検出理論のd′計算に使用）
+let answering = false; // 二重回答防止（連打やタイムアウトとの同時押しでcheckAnswerが多重発火するのを防ぐ）
 
 /**
  * ランダムな要素を配列から選択
@@ -114,6 +115,7 @@ async function startGame() {
     correctScore = 0;
     totalClearTime = 0;
     trialLog = [];
+    answering = false;
     
     // UI要素を表示/非表示
     gameMainArea.classList.remove('hidden');
@@ -136,7 +138,8 @@ function nextQuestion() {
     
     currentQuestionNumber++;
     remainingTime = TIME_LIMIT;
-    
+    answering = false;
+
     // UI更新
     updateDisplay();
     
@@ -266,8 +269,10 @@ function stopTimer() {
  * 回答をチェック
  */
 function checkAnswer(userAnswer, isTimeout = false) {
+    if (answering) return; // 連打・タイムアウトとの同時押しによる多重発火を防止
+    answering = true;
     stopTimer();
-    
+
     const responseTime = (Date.now() - questionStartTime) / 1000;
     const isCorrect = userAnswer === hasTarget;
 
