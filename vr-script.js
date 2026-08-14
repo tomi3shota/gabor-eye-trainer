@@ -115,33 +115,41 @@ let retryMesh, homeMesh;
 
 const clock = new THREE.Clock();
 
-// --- 目の間隔(IPD)調整 ---
+// --- 目の間隔(レンズ位置)調整 ---
 // ダンボールゴーグルのレンズ間隔は機種・スマホごとにバラつきがあり、左右の映像が
 // 綺麗に重ならないことがあるため、その場でプレイヤーが微調整できるようにする。
+// カメラの3D位置をわずかに動かす方式だと、パネルが正面2.5m先にあるため見た目の
+// 変化がほぼ感じられなかった（角度にしてtaps数十回でも1〜2度程度）。
+// 代わりにsetViewOffsetで各目の描画そのものを画面上でピクセル単位に水平シフトし、
+// タップ1回あたりの効果がはっきりわかるようにする。
 // 調整値は端末ごとにlocalStorageへ保存し、次回以降も引き継ぐ。
-const DEFAULT_IPD = 0.064; // 瞳孔間距離(m)の近似値
-const IPD_STEP = 0.002;
-const IPD_MIN = 0.02;
-const IPD_MAX = 0.12;
+const EYE_OFFSET_STEP_PX = 20;
+const EYE_OFFSET_MAX_PX = 200;
 
-function loadStoredIPD() {
-    const stored = parseFloat(localStorage.getItem('vrEyeSeparation'));
-    return Number.isFinite(stored) ? Math.min(IPD_MAX, Math.max(IPD_MIN, stored)) : DEFAULT_IPD;
+function loadStoredEyeOffset() {
+    const stored = parseInt(localStorage.getItem('vrEyeOffsetPx'), 10);
+    return Number.isFinite(stored) ? Math.min(EYE_OFFSET_MAX_PX, Math.max(-EYE_OFFSET_MAX_PX, stored)) : 0;
 }
 
-let IPD = loadStoredIPD();
+let eyeOffsetPx = loadStoredEyeOffset();
 const PANEL_DISTANCE = 2.5; // パネルまでの距離(m)
 
-// 現在のIPD値を左右カメラの位置に反映する
-function applyIPD() {
-    if (leftCamera) leftCamera.position.x = -IPD / 2;
-    if (rightCamera) rightCamera.position.x = IPD / 2;
+// 現在のズレ量を左右それぞれの描画に反映する（setViewOffsetで見た目上の
+// 表示位置をピクセル単位でずらす。大きめの仮想フレームの中から半分の幅を
+// 切り出す位置をずらすことで、レンズに対する見え方を調整する）
+function applyEyeOffset() {
+    if (!leftCamera || !rightCamera || !renderer) return;
+    const halfW = Math.max(1, Math.floor(window.innerWidth / 2));
+    const h = Math.max(1, window.innerHeight);
+    const fullW = halfW + EYE_OFFSET_MAX_PX * 2;
+    leftCamera.setViewOffset(fullW, h, EYE_OFFSET_MAX_PX - eyeOffsetPx, 0, halfW, h);
+    rightCamera.setViewOffset(fullW, h, EYE_OFFSET_MAX_PX + eyeOffsetPx, 0, halfW, h);
 }
 
-function adjustIPD(delta) {
-    IPD = Math.min(IPD_MAX, Math.max(IPD_MIN, IPD + delta));
-    applyIPD();
-    localStorage.setItem('vrEyeSeparation', IPD.toFixed(4));
+function adjustEyeOffset(delta) {
+    eyeOffsetPx = Math.min(EYE_OFFSET_MAX_PX, Math.max(-EYE_OFFSET_MAX_PX, eyeOffsetPx + delta));
+    applyEyeOffset();
+    localStorage.setItem('vrEyeOffsetPx', String(eyeOffsetPx));
 }
 
 function initThree() {
@@ -162,8 +170,6 @@ function initThree() {
     rightCamera = new THREE.PerspectiveCamera(70, 1, 0.05, 50);
     cameraRig.add(rightCamera);
 
-    applyIPD();
-
     // 環境光的な補助光（MeshBasicMaterialを主に使うため必須ではないが保険）
     scene.add(new THREE.AmbientLight(0xffffff, 1.0));
 
@@ -181,8 +187,7 @@ function onResize() {
     const eyeAspect = (width / 2) / height;
     leftCamera.aspect = eyeAspect;
     rightCamera.aspect = eyeAspect;
-    leftCamera.updateProjectionMatrix();
-    rightCamera.updateProjectionMatrix();
+    applyEyeOffset(); // aspect変更後に呼ぶ（setViewOffset内でupdateProjectionMatrix()まで行う）
     positionReticles();
 }
 
@@ -262,13 +267,19 @@ function buildUiPanel() {
         }
     }
 
-    // --- ある/ないボタン ---
-    btnYesMesh = makeButtonPlane('ある！', 0x4CAF50);
-    btnYesMesh.position.set(-1.15, -0.55, 0);
+    // --- ある/ないボタン（3x3グリッドの下に横並びで配置） ---
+    const btnOptsAnswer = { width: 0.68, height: 0.26, canvasWidth: 560, canvasHeight: 214, fontSize: 92 };
+    const answerRowWidth = gridWidth + 0.15; // gridBg(背景カード)の幅に揃える
+    const answerBtnGap = answerRowWidth - btnOptsAnswer.width * 2;
+    const answerRowLeft = gridOriginX - answerRowWidth / 2;
+    const answerBtnY = (gridOriginY - (gridHeight + 0.15) / 2) - 0.09 - btnOptsAnswer.height / 2;
+
+    btnYesMesh = makeButtonPlane('ある！', 0x4CAF50, btnOptsAnswer);
+    btnYesMesh.position.set(answerRowLeft + btnOptsAnswer.width / 2, answerBtnY, 0);
     gameplayGroup.add(btnYesMesh);
 
-    btnNoMesh = makeButtonPlane('ない！', 0xF44336);
-    btnNoMesh.position.set(-1.15, -0.9, 0);
+    btnNoMesh = makeButtonPlane('ない！', 0xF44336, btnOptsAnswer);
+    btnNoMesh.position.set(answerRowLeft + btnOptsAnswer.width + answerBtnGap + btnOptsAnswer.width / 2, answerBtnY, 0);
     gameplayGroup.add(btnNoMesh);
 
     // --- フィードバック表示 ---
@@ -1053,8 +1064,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
     const ipdMinusBtn = document.getElementById('ipd-minus-btn');
     const ipdPlusBtn = document.getElementById('ipd-plus-btn');
-    if (ipdMinusBtn) ipdMinusBtn.addEventListener('click', () => adjustIPD(-IPD_STEP));
-    if (ipdPlusBtn) ipdPlusBtn.addEventListener('click', () => adjustIPD(IPD_STEP));
+    if (ipdMinusBtn) ipdMinusBtn.addEventListener('click', () => adjustEyeOffset(-EYE_OFFSET_STEP_PX));
+    if (ipdPlusBtn) ipdPlusBtn.addEventListener('click', () => adjustEyeOffset(EYE_OFFSET_STEP_PX));
 
     // 読み込み中オーバーレイを消し、スタート画面（3Dパネル）に切り替える
     document.getElementById('start-overlay').classList.add('hidden');
