@@ -144,6 +144,9 @@ function applyEyeOffset() {
     const fullW = halfW + EYE_OFFSET_MAX_PX * 2;
     leftCamera.setViewOffset(fullW, h, EYE_OFFSET_MAX_PX - eyeOffsetPx, 0, halfW, h);
     rightCamera.setViewOffset(fullW, h, EYE_OFFSET_MAX_PX + eyeOffsetPx, 0, halfW, h);
+    // レティクル（照準）は3D空間ではなく画面固定のHTML要素なので、
+    // ここで一緒にずらさないと3D側の映像だけ調整されて位置がズレたままになる
+    positionReticles();
 }
 
 function adjustEyeOffset(delta) {
@@ -622,10 +625,28 @@ function createReticles() {
     positionReticles();
 }
 
+// カメラのローカル正面方向(0,0,-1)が、そのカメラ自身のビューポート内で
+// どこに投影されるかをNDC(-1〜1)で返す。setViewOffset()で非対称フラスタムに
+// なっている場合、正面はビューポート中央にはならないため実際に投影して求める。
+function projectLocalForwardToNdc(camera) {
+    const p = new THREE.Vector4(0, 0, -1, 1);
+    p.applyMatrix4(camera.projectionMatrix);
+    return [p.x / p.w, p.y / p.w];
+}
+
 function positionReticles() {
-    if (!reticleLeftEl) return;
-    reticleLeftEl.style.left = (window.innerWidth * 0.25) + 'px';
-    reticleRightEl.style.left = (window.innerWidth * 0.75) + 'px';
+    if (!reticleLeftEl || !leftCamera || !rightCamera) return;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const halfW = width / 2;
+
+    const [leftNdcX, leftNdcY] = projectLocalForwardToNdc(leftCamera);
+    const [rightNdcX, rightNdcY] = projectLocalForwardToNdc(rightCamera);
+
+    reticleLeftEl.style.left = ((leftNdcX + 1) / 2 * halfW) + 'px';
+    reticleLeftEl.style.top = ((1 - (leftNdcY + 1) / 2) * height) + 'px';
+    reticleRightEl.style.left = (halfW + (rightNdcX + 1) / 2 * halfW) + 'px';
+    reticleRightEl.style.top = ((1 - (rightNdcY + 1) / 2) * height) + 'px';
 }
 
 function setReticleHover(hovered) {
