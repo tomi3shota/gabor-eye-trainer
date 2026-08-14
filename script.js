@@ -43,10 +43,11 @@ let questionStartTime = 0;
 let totalClearTime = 0;
 let timer;
 let remainingTime = TIME_LIMIT;
-let targetImage = '';
+let targetImage = null; // 現在の問題のターゲットcanvas
 let targetConfig = null;
 let hasTarget = false;
-let gaborPatches = [];
+let gaborPatches = []; // 現在の問題の9枚（canvasオブジェクトの配列）
+let patchCanvases = []; // 表示用に使い回す<canvas>要素（毎問題作り直さない）
 let trialLog = []; // 問題単位のログ（信号検出理論のd′計算に使用）
 let answering = false; // 二重回答防止（連打やタイムアウトとの同時押しでcheckAnswerが多重発火するのを防ぐ）
 
@@ -154,9 +155,12 @@ function nextQuestion() {
  * 問題を生成
  */
 function generateQuestion() {
-    // ターゲットのガボールパッチをその場でランダム生成（固定画像を使い回さないことで記憶による正答を防ぐ）
+    // ターゲットのガボールパッチをその場でランダム生成（固定画像を使い回さないことで記憶による正答を防ぐ）。
+    // 生成したcanvasはそのまま描画に使い、<img>のbase64変換は挟まない
+    // （30問休憩なしの事前/事後テストでtoDataURL()＋<img>デコードを大量に繰り返すと
+    // ブラウザの画像キャッシュにメモリが積み上がり、終盤で固まる原因になっていたため）
     targetConfig = randomGaborConfig();
-    targetImage = renderGaborDataURL(targetConfig);
+    targetImage = renderGaborCanvas(targetConfig);
 
     // ターゲットが含まれるかどうかをランダムに決定
     hasTarget = Math.random() < 0.5;
@@ -168,11 +172,11 @@ function generateQuestion() {
         // ターゲットと同じ画像（同一パラメータ）を1枚含める
         gaborPatches.push(targetImage);
         for (let i = 0; i < PATCH_COUNT - 1; i++) {
-            gaborPatches.push(renderGaborDataURL(randomDistractorConfig(targetConfig)));
+            gaborPatches.push(renderGaborCanvas(randomDistractorConfig(targetConfig)));
         }
     } else {
         for (let i = 0; i < PATCH_COUNT; i++) {
-            gaborPatches.push(renderGaborDataURL(randomDistractorConfig(targetConfig)));
+            gaborPatches.push(renderGaborCanvas(randomDistractorConfig(targetConfig)));
         }
     }
 
@@ -189,43 +193,66 @@ function generateQuestion() {
 }
 
 /**
+ * 表示用の永続canvasを初回だけ作成する（毎問題ごとに<img>を作り直さず使い回す）
+ */
+function ensureDisplayCanvases() {
+    if (targetImageElement.width !== 300) {
+        targetImageElement.width = 300;
+        targetImageElement.height = 300;
+    }
+    if (patchCanvases.length === PATCH_COUNT) return;
+    gaborArea.innerHTML = '';
+    patchCanvases = [];
+    for (let i = 0; i < PATCH_COUNT; i++) {
+        const canvas = document.createElement('canvas');
+        canvas.className = 'gabor-patch';
+        canvas.width = 200;
+        canvas.height = 200;
+        gaborArea.appendChild(canvas);
+        patchCanvases.push(canvas);
+    }
+}
+
+// 生成したガボールパッチ(srcCanvas)を表示用canvasへ、CSSのobject-fit:coverと
+// 同じ見た目になるよう中央をクロップして描画する（canvasはobject-fitが効かないため）
+function drawGaborCover(destCanvas, srcCanvas) {
+    const destW = destCanvas.width, destH = destCanvas.height;
+    const srcW = srcCanvas.width, srcH = srcCanvas.height;
+    const destAspect = destW / destH;
+    const srcAspect = srcW / srcH;
+
+    let sx, sy, sw, sh;
+    if (srcAspect > destAspect) {
+        sh = srcH;
+        sw = srcH * destAspect;
+        sy = 0;
+        sx = (srcW - sw) / 2;
+    } else {
+        sw = srcW;
+        sh = srcW / destAspect;
+        sx = 0;
+        sy = (srcH - sh) / 2;
+    }
+
+    const ctx = destCanvas.getContext('2d');
+    ctx.clearRect(0, 0, destW, destH);
+    ctx.drawImage(srcCanvas, sx, sy, sw, sh, 0, 0, destW, destH);
+}
+
+/**
  * 問題をUIに表示
  */
 function displayQuestion() {
+    ensureDisplayCanvases();
+
     // ターゲット画像を表示
-    targetImageElement.src = targetImage;
-    targetImageElement.alt = 'お題の画像';
-    
-    // 画像読み込みエラーハンドリング
-    targetImageElement.onerror = function() {
-        console.error('ターゲット画像の読み込みに失敗:', targetImage);
-        this.style.backgroundColor = '#f0f0f0';
-        this.style.border = '2px dashed #ccc';
-        this.alt = '画像読み込みエラー';
-    };
-    
-    // ガボールパッチエリアをクリア
-    gaborArea.innerHTML = '';
-    
+    drawGaborCover(targetImageElement, targetImage);
+
     // 9個のガボールパッチを表示
-    gaborPatches.forEach((imagePath, index) => {
-        const img = document.createElement('img');
-        img.src = imagePath;
-        img.alt = `ガボールパッチ ${index + 1}`;
-        
-        // 画像読み込みエラーハンドリング
-        img.onerror = function() {
-            console.error('ガボールパッチ画像の読み込みに失敗:', imagePath);
-            this.style.backgroundColor = '#f0f0f0';
-            this.style.border = '1px dashed #ccc';
-            this.style.width = '150px';
-            this.style.height = '150px';
-            this.alt = `画像エラー ${index + 1}`;
-        };
-        img.className = 'gabor-patch';
-        gaborArea.appendChild(img);
+    gaborPatches.forEach((srcCanvas, index) => {
+        drawGaborCover(patchCanvases[index], srcCanvas);
     });
-    
+
     // フィードバックをクリア
     feedbackElement.textContent = '';
     feedbackElement.className = 'feedback';

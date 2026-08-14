@@ -80,11 +80,3 @@ function renderGaborCanvas(config) {
     ctx.putImageData(imageData, 0, 0);
     return canvas;
 }
-
-function renderGaborDataURL(config) {
-    // PNG(可逆圧縮)は生成コストが高く、休憩なしの30問テストのように短時間で
-    // 大量(1問9枚)に生成すると終盤にかけてメモリ・CPU負荷が蓄積しやすい。
-    // ガボールパッチは不透明なグレースケールの縞模様で圧縮アーティファクトが
-    // 目立ちにくいため、エンコードが軽いJPEGに切り替えて負荷を下げる。
-    return renderGaborCanvas(config).toDataURL('image/jpeg', 0.85);
-}
